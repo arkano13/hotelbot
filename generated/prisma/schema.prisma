@@ -177,8 +177,9 @@ model Conversation {
 
   reservaId String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  ultimaDisponibilidadAt DateTime?
 
   messages Message[]
 

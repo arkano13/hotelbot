@@ -46,7 +46,7 @@ export const hotelTools = [
       {
         name: "crear_reserva",
         description:
-          "Crea la reserva temporal únicamente después de que el cliente haya confirmado claramente los datos y haya proporcionado su nombre.",
+          "Crea una reserva temporal únicamente cuando el cliente ya confirmó que desea reservar y proporcionó su nombre completo.",
         parameters: {
           type: "OBJECT",
           properties: {

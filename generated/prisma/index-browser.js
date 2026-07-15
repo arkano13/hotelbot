@@ -202,7 +202,8 @@ exports.Prisma.ConversationScalarFieldEnum = {
   cantidadPersonas: 'cantidadPersonas',
   reservaId: 'reservaId',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  ultimaDisponibilidadAt: 'ultimaDisponibilidadAt'
 };
 
 exports.Prisma.MessageScalarFieldEnum = {

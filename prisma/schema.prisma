@@ -92,62 +92,61 @@ model Tarifa {
 }
 
 model Reserva {
-  id               String        @id @default(uuid())
-  codigo           String        @unique
-  clienteId        String
-  habitacionId     String
+  id           String @id @default(uuid())
+  codigo       String @unique
+  clienteId    String
+  habitacionId String
 
-  fechaEntrada     DateTime
-  fechaSalida      DateTime
+  fechaEntrada DateTime
+  fechaSalida  DateTime
 
   cantidadPersonas Int
   cantidadNoches   Int
 
-  precioPorNoche   Decimal       @db.Decimal(10, 2)
-  precioTotal      Decimal       @db.Decimal(10, 2)
+  precioPorNoche Decimal @db.Decimal(10, 2)
+  precioTotal    Decimal @db.Decimal(10, 2)
 
-  estado           EstadoReserva @default(PENDIENTE_PAGO)
+  estado EstadoReserva @default(PENDIENTE_PAGO)
 
-  expiraEn         DateTime?
+  expiraEn DateTime?
 
-  observaciones    String?
+  observaciones String?
 
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  cliente          Cliente       @relation(fields: [clienteId], references: [id])
-  habitacion       Habitacion    @relation(fields: [habitacionId], references: [id])
-  pago             Pago?
+  cliente    Cliente    @relation(fields: [clienteId], references: [id])
+  habitacion Habitacion @relation(fields: [habitacionId], references: [id])
+  pago       Pago?
 
   @@index([fechaEntrada, fechaSalida])
   @@index([habitacionId, estado])
   @@index([clienteId])
-
   @@map("reservas")
 }
 
 model Pago {
-  id                 String      @id @default(uuid())
-  reservaId          String      @unique
+  id        String @id @default(uuid())
+  reservaId String @unique
 
-  proveedor          String      @default("CLINPAYS")
-  referenciaExterna  String?     @unique
+  proveedor         String  @default("CLINPAYS")
+  referenciaExterna String? @unique
 
-  monto              Decimal     @db.Decimal(10, 2)
-  moneda             String      @default("HNL")
+  monto  Decimal @db.Decimal(10, 2)
+  moneda String  @default("HNL")
 
-  estado             EstadoPago  @default(NO_GENERADO)
+  estado EstadoPago @default(NO_GENERADO)
 
-  urlPago            String?
+  urlPago String?
 
-  fechaPago          DateTime?
+  fechaPago DateTime?
 
   respuestaProveedor Json?
 
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  reserva            Reserva     @relation(fields: [reservaId], references: [id])
+  reserva Reserva @relation(fields: [reservaId], references: [id])
 
   @@map("pagos")
 }
@@ -164,22 +163,23 @@ model ImagenHabitacion {
 }
 
 model Conversation {
-  id        String           @id @default(uuid())
+  id String @id @default(uuid())
 
-  telefono  String           @unique
+  telefono String @unique
 
-  mode      ConversationMode @default(BOT)
-  step      BookingStep      @default(INICIO)
+  mode ConversationMode @default(BOT)
+  step BookingStep      @default(INICIO)
 
   nombreCliente    String?
   fechaEntrada     DateTime?
   fechaSalida      DateTime?
   cantidadPersonas Int?
 
-  reservaId        String?
+  reservaId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  ultimaDisponibilidadAt DateTime?
 
   messages Message[]
 
@@ -187,23 +187,22 @@ model Conversation {
 }
 
 model Message {
-  id             String      @id @default(uuid())
+  id String @id @default(uuid())
 
   conversationId String
 
-  role           MessageRole
+  role MessageRole
 
-  content        String
+  content String
 
-  toolName       String?
+  toolName String?
 
-  toolData       Json?
+  toolData Json?
 
-  createdAt      DateTime    @default(now())
+  createdAt DateTime @default(now())
 
-conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
-
   @@map("messages")
 }
