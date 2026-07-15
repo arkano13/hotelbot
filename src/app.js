@@ -1,0 +1,44 @@
+import express from "express";
+import cors from "cors";
+
+import tarifasRoutes from "./tarifas/routes.js";
+import clientesRoutes from "./clientes/routes.js";
+import disponibilidadRoutes from "./disponibilidad/routes.js";
+import reservasRoutes from "./reservas/routes.js";
+import pagosRoutes from "./pagos/routes.js";
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "API del hotel funcionando",
+  });
+});
+
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    status: "OK",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.use("/api/tarifas", tarifasRoutes);
+app.use("/api/clientes", clientesRoutes);
+app.use("/api/disponibilidad", disponibilidadRoutes);
+app.use("/api/reservas", reservasRoutes);
+app.use("/api/pagos", pagosRoutes);
+
+
+app.use((req, res) => {
+  return res.status(404).json({
+    success: false,
+    message: "Ruta no encontrada",
+  });
+});
+
+export { app };
