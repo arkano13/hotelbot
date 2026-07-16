@@ -1,20 +1,72 @@
 import { prisma } from "../lib/prisma.js";
 
-export async function obtenerOCrearConversacion(telefono) {
-  const telefonoLimpio = String(telefono ?? "").trim();
+function limpiarTelefono(telefono) {
+  return String(telefono ?? "")
+    .replace(/\D/g, "")
+    .trim();
+}
+
+async function generarCodigoConversacion() {
+  while (true) {
+    const codigo = `C${Math.floor(
+      1000 + Math.random() * 9000
+    )}`;
+
+    const existente =
+      await prisma.conversation.findUnique({
+        where: {
+          codigo,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    if (!existente) {
+      return codigo;
+    }
+  }
+}
+
+export async function obtenerOCrearConversacion(
+  telefono
+) {
+  const telefonoLimpio =
+    limpiarTelefono(telefono);
 
   if (!telefonoLimpio) {
-    throw new Error("El teléfono es obligatorio");
+    throw new Error(
+      "El teléfono es obligatorio"
+    );
   }
 
-  return prisma.conversation.upsert({
-    where: {
-      telefono: telefonoLimpio,
-    },
-    update: {},
-    create: {
+  const conversacionExistente =
+    await prisma.conversation.findUnique({
+      where: {
+        telefono: telefonoLimpio,
+      },
+    });
+
+  if (conversacionExistente) {
+    return prisma.conversation.update({
+      where: {
+        id: conversacionExistente.id,
+      },
+      data: {
+        status: "ACTIVA",
+      },
+    });
+  }
+
+  const codigo =
+    await generarCodigoConversacion();
+
+  return prisma.conversation.create({
+    data: {
+      codigo,
       telefono: telefonoLimpio,
       mode: "BOT",
+      status: "ACTIVA",
       step: "INICIO",
     },
   });
@@ -24,36 +76,107 @@ export async function obtenerConversacionConHistorial(
   telefono,
   limite = 15
 ) {
-  const telefonoLimpio = String(telefono ?? "").trim();
+  const telefonoLimpio =
+    limpiarTelefono(telefono);
 
-  const conversation = await prisma.conversation.findUnique({
-    where: {
-      telefono: telefonoLimpio,
-    },
-    include: {
-      messages: {
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: limite,
+  if (!telefonoLimpio) {
+    throw new Error(
+      "El teléfono es obligatorio"
+    );
+  }
+
+  const conversacion =
+    await prisma.conversation.findUnique({
+      where: {
+        telefono: telefonoLimpio,
       },
-    },
-  });
+      include: {
+        messages: {
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: limite,
+        },
+      },
+    });
 
-  if (!conversation) {
+  if (!conversacion) {
     return null;
   }
 
   return {
-    ...conversation,
-    messages: conversation.messages.reverse(),
+    ...conversacion,
+    messages:
+      conversacion.messages.reverse(),
   };
+}
+
+export async function obtenerConversacionPorId(
+  id
+) {
+  if (!id) {
+    throw new Error(
+      "El ID de la conversación es obligatorio"
+    );
+  }
+
+  const conversacion =
+    await prisma.conversation.findUnique({
+      where: {
+        id,
+      },
+    });
+
+  if (!conversacion) {
+    throw new Error(
+      "Conversación no encontrada"
+    );
+  }
+
+  return conversacion;
+}
+
+export async function obtenerConversacionPorCodigo(
+  codigo
+) {
+  const codigoLimpio = String(
+    codigo ?? ""
+  )
+    .trim()
+    .toUpperCase();
+
+  if (!codigoLimpio) {
+    throw new Error(
+      "El código de conversación es obligatorio"
+    );
+  }
+
+  const conversacion =
+    await prisma.conversation.findUnique({
+      where: {
+        codigo: codigoLimpio,
+      },
+    });
+
+  if (!conversacion) {
+    throw new Error(
+      "Conversación no encontrada"
+    );
+  }
+
+  return conversacion;
 }
 
 export async function actualizarEstadoConversacion(
   conversationId,
   data
 ) {
+  if (!conversationId) {
+    throw new Error(
+      "El ID de la conversación es obligatorio"
+    );
+  }
+
   return prisma.conversation.update({
     where: {
       id: conversationId,
@@ -62,22 +185,50 @@ export async function actualizarEstadoConversacion(
   });
 }
 
-export async function obtenerConversacionPorId(id) {
-  const conversacion = await prisma.conversation.findUnique({
-    where: {
-      id,
-    },
-  });
+export async function cambiarModoConversacion(
+  conversationId,
+  mode
+) {
+  const modo = String(mode ?? "")
+    .trim()
+    .toUpperCase();
 
-  if (!conversacion) {
-    throw new Error("Conversación no encontrada");
+  if (!["BOT", "HUMANO"].includes(modo)) {
+    throw new Error(
+      "Modo de conversación inválido"
+    );
   }
 
-  return conversacion;
+  return prisma.conversation.update({
+    where: {
+      id: conversationId,
+    },
+    data: {
+      mode: modo,
+      status: "ACTIVA",
+    },
+  });
 }
-export async function reiniciarDatosReserva(conversationId) {
+
+export async function listarConversacionesActivas() {
+  return prisma.conversation.findMany({
+    where: {
+      status: "ACTIVA",
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+    take: 20,
+  });
+}
+
+export async function reiniciarDatosReserva(
+  conversationId
+) {
   if (!conversationId) {
-    throw new Error("El ID de la conversación es obligatorio");
+    throw new Error(
+      "El ID de la conversación es obligatorio"
+    );
   }
 
   return prisma.conversation.update({
@@ -91,7 +242,47 @@ export async function reiniciarDatosReserva(conversationId) {
       cantidadPersonas: null,
       nombreCliente: null,
       reservaId: null,
+      reservaIds: null,
       ultimaDisponibilidadAt: null,
+      status: "ACTIVA",
+    },
+  });
+}
+
+export async function finalizarConversacion(
+  conversationId
+) {
+  if (!conversationId) {
+    throw new Error(
+      "El ID de la conversación es obligatorio"
+    );
+  }
+
+  return prisma.conversation.update({
+    where: {
+      id: conversationId,
+    },
+    data: {
+      status: "FINALIZADA",
+    },
+  });
+}
+
+export async function reactivarConversacion(
+  conversationId
+) {
+  if (!conversationId) {
+    throw new Error(
+      "El ID de la conversación es obligatorio"
+    );
+  }
+
+  return prisma.conversation.update({
+    where: {
+      id: conversationId,
+    },
+    data: {
+      status: "ACTIVA",
     },
   });
 }

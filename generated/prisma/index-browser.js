@@ -193,18 +193,20 @@ exports.Prisma.ImagenHabitacionScalarFieldEnum = {
 
 exports.Prisma.ConversationScalarFieldEnum = {
   id: 'id',
+  codigo: 'codigo',
   telefono: 'telefono',
   mode: 'mode',
+  status: 'status',
   step: 'step',
   nombreCliente: 'nombreCliente',
   fechaEntrada: 'fechaEntrada',
   fechaSalida: 'fechaSalida',
   cantidadPersonas: 'cantidadPersonas',
   reservaId: 'reservaId',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
+  reservaIds: 'reservaIds',
   ultimaDisponibilidadAt: 'ultimaDisponibilidadAt',
-  reservaIds: 'reservaIds'
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.MessageScalarFieldEnum = {
@@ -269,6 +271,11 @@ exports.EstadoPago = exports.$Enums.EstadoPago = {
 exports.ConversationMode = exports.$Enums.ConversationMode = {
   BOT: 'BOT',
   HUMANO: 'HUMANO'
+};
+
+exports.ConversationStatus = exports.$Enums.ConversationStatus = {
+  ACTIVA: 'ACTIVA',
+  FINALIZADA: 'FINALIZADA'
 };
 
 exports.BookingStep = exports.$Enums.BookingStep = {

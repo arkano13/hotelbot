@@ -120,6 +120,14 @@ export const MessageRole: {
 
 export type MessageRole = (typeof MessageRole)[keyof typeof MessageRole]
 
+
+export const ConversationStatus: {
+  ACTIVA: 'ACTIVA',
+  FINALIZADA: 'FINALIZADA'
+};
+
+export type ConversationStatus = (typeof ConversationStatus)[keyof typeof ConversationStatus]
+
 }
 
 export type EstadoHabitacion = $Enums.EstadoHabitacion
@@ -145,6 +153,10 @@ export const BookingStep: typeof $Enums.BookingStep
 export type MessageRole = $Enums.MessageRole
 
 export const MessageRole: typeof $Enums.MessageRole
+
+export type ConversationStatus = $Enums.ConversationStatus
+
+export const ConversationStatus: typeof $Enums.ConversationStatus
 
 /**
  * ##  Prisma Client ʲˢ
@@ -8497,48 +8509,54 @@ export namespace Prisma {
 
   export type ConversationMinAggregateOutputType = {
     id: string | null
+    codigo: string | null
     telefono: string | null
     mode: $Enums.ConversationMode | null
+    status: $Enums.ConversationStatus | null
     step: $Enums.BookingStep | null
     nombreCliente: string | null
     fechaEntrada: Date | null
     fechaSalida: Date | null
     cantidadPersonas: number | null
     reservaId: string | null
+    ultimaDisponibilidadAt: Date | null
     createdAt: Date | null
     updatedAt: Date | null
-    ultimaDisponibilidadAt: Date | null
   }
 
   export type ConversationMaxAggregateOutputType = {
     id: string | null
+    codigo: string | null
     telefono: string | null
     mode: $Enums.ConversationMode | null
+    status: $Enums.ConversationStatus | null
     step: $Enums.BookingStep | null
     nombreCliente: string | null
     fechaEntrada: Date | null
     fechaSalida: Date | null
     cantidadPersonas: number | null
     reservaId: string | null
+    ultimaDisponibilidadAt: Date | null
     createdAt: Date | null
     updatedAt: Date | null
-    ultimaDisponibilidadAt: Date | null
   }
 
   export type ConversationCountAggregateOutputType = {
     id: number
+    codigo: number
     telefono: number
     mode: number
+    status: number
     step: number
     nombreCliente: number
     fechaEntrada: number
     fechaSalida: number
     cantidadPersonas: number
     reservaId: number
+    reservaIds: number
+    ultimaDisponibilidadAt: number
     createdAt: number
     updatedAt: number
-    ultimaDisponibilidadAt: number
-    reservaIds: number
     _all: number
   }
 
@@ -8553,48 +8571,54 @@ export namespace Prisma {
 
   export type ConversationMinAggregateInputType = {
     id?: true
+    codigo?: true
     telefono?: true
     mode?: true
+    status?: true
     step?: true
     nombreCliente?: true
     fechaEntrada?: true
     fechaSalida?: true
     cantidadPersonas?: true
     reservaId?: true
+    ultimaDisponibilidadAt?: true
     createdAt?: true
     updatedAt?: true
-    ultimaDisponibilidadAt?: true
   }
 
   export type ConversationMaxAggregateInputType = {
     id?: true
+    codigo?: true
     telefono?: true
     mode?: true
+    status?: true
     step?: true
     nombreCliente?: true
     fechaEntrada?: true
     fechaSalida?: true
     cantidadPersonas?: true
     reservaId?: true
+    ultimaDisponibilidadAt?: true
     createdAt?: true
     updatedAt?: true
-    ultimaDisponibilidadAt?: true
   }
 
   export type ConversationCountAggregateInputType = {
     id?: true
+    codigo?: true
     telefono?: true
     mode?: true
+    status?: true
     step?: true
     nombreCliente?: true
     fechaEntrada?: true
     fechaSalida?: true
     cantidadPersonas?: true
     reservaId?: true
+    reservaIds?: true
+    ultimaDisponibilidadAt?: true
     createdAt?: true
     updatedAt?: true
-    ultimaDisponibilidadAt?: true
-    reservaIds?: true
     _all?: true
   }
 
@@ -8686,18 +8710,20 @@ export namespace Prisma {
 
   export type ConversationGroupByOutputType = {
     id: string
+    codigo: string
     telefono: string
     mode: $Enums.ConversationMode
+    status: $Enums.ConversationStatus
     step: $Enums.BookingStep
     nombreCliente: string | null
     fechaEntrada: Date | null
     fechaSalida: Date | null
     cantidadPersonas: number | null
     reservaId: string | null
+    reservaIds: JsonValue | null
+    ultimaDisponibilidadAt: Date | null
     createdAt: Date
     updatedAt: Date
-    ultimaDisponibilidadAt: Date | null
-    reservaIds: JsonValue | null
     _count: ConversationCountAggregateOutputType | null
     _avg: ConversationAvgAggregateOutputType | null
     _sum: ConversationSumAggregateOutputType | null
@@ -8721,71 +8747,79 @@ export namespace Prisma {
 
   export type ConversationSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    codigo?: boolean
     telefono?: boolean
     mode?: boolean
+    status?: boolean
     step?: boolean
     nombreCliente?: boolean
     fechaEntrada?: boolean
     fechaSalida?: boolean
     cantidadPersonas?: boolean
     reservaId?: boolean
+    reservaIds?: boolean
+    ultimaDisponibilidadAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
-    ultimaDisponibilidadAt?: boolean
-    reservaIds?: boolean
     messages?: boolean | Conversation$messagesArgs<ExtArgs>
     _count?: boolean | ConversationCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["conversation"]>
 
   export type ConversationSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    codigo?: boolean
     telefono?: boolean
     mode?: boolean
+    status?: boolean
     step?: boolean
     nombreCliente?: boolean
     fechaEntrada?: boolean
     fechaSalida?: boolean
     cantidadPersonas?: boolean
     reservaId?: boolean
+    reservaIds?: boolean
+    ultimaDisponibilidadAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
-    ultimaDisponibilidadAt?: boolean
-    reservaIds?: boolean
   }, ExtArgs["result"]["conversation"]>
 
   export type ConversationSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    codigo?: boolean
     telefono?: boolean
     mode?: boolean
+    status?: boolean
     step?: boolean
     nombreCliente?: boolean
     fechaEntrada?: boolean
     fechaSalida?: boolean
     cantidadPersonas?: boolean
     reservaId?: boolean
+    reservaIds?: boolean
+    ultimaDisponibilidadAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
-    ultimaDisponibilidadAt?: boolean
-    reservaIds?: boolean
   }, ExtArgs["result"]["conversation"]>
 
   export type ConversationSelectScalar = {
     id?: boolean
+    codigo?: boolean
     telefono?: boolean
     mode?: boolean
+    status?: boolean
     step?: boolean
     nombreCliente?: boolean
     fechaEntrada?: boolean
     fechaSalida?: boolean
     cantidadPersonas?: boolean
     reservaId?: boolean
+    reservaIds?: boolean
+    ultimaDisponibilidadAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
-    ultimaDisponibilidadAt?: boolean
-    reservaIds?: boolean
   }
 
-  export type ConversationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "telefono" | "mode" | "step" | "nombreCliente" | "fechaEntrada" | "fechaSalida" | "cantidadPersonas" | "reservaId" | "createdAt" | "updatedAt" | "ultimaDisponibilidadAt" | "reservaIds", ExtArgs["result"]["conversation"]>
+  export type ConversationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "codigo" | "telefono" | "mode" | "status" | "step" | "nombreCliente" | "fechaEntrada" | "fechaSalida" | "cantidadPersonas" | "reservaId" | "reservaIds" | "ultimaDisponibilidadAt" | "createdAt" | "updatedAt", ExtArgs["result"]["conversation"]>
   export type ConversationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     messages?: boolean | Conversation$messagesArgs<ExtArgs>
     _count?: boolean | ConversationCountOutputTypeDefaultArgs<ExtArgs>
@@ -8800,18 +8834,20 @@ export namespace Prisma {
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
+      codigo: string
       telefono: string
       mode: $Enums.ConversationMode
+      status: $Enums.ConversationStatus
       step: $Enums.BookingStep
       nombreCliente: string | null
       fechaEntrada: Date | null
       fechaSalida: Date | null
       cantidadPersonas: number | null
       reservaId: string | null
+      reservaIds: Prisma.JsonValue | null
+      ultimaDisponibilidadAt: Date | null
       createdAt: Date
       updatedAt: Date
-      ultimaDisponibilidadAt: Date | null
-      reservaIds: Prisma.JsonValue | null
     }, ExtArgs["result"]["conversation"]>
     composites: {}
   }
@@ -9237,18 +9273,20 @@ export namespace Prisma {
    */
   interface ConversationFieldRefs {
     readonly id: FieldRef<"Conversation", 'String'>
+    readonly codigo: FieldRef<"Conversation", 'String'>
     readonly telefono: FieldRef<"Conversation", 'String'>
     readonly mode: FieldRef<"Conversation", 'ConversationMode'>
+    readonly status: FieldRef<"Conversation", 'ConversationStatus'>
     readonly step: FieldRef<"Conversation", 'BookingStep'>
     readonly nombreCliente: FieldRef<"Conversation", 'String'>
     readonly fechaEntrada: FieldRef<"Conversation", 'DateTime'>
     readonly fechaSalida: FieldRef<"Conversation", 'DateTime'>
     readonly cantidadPersonas: FieldRef<"Conversation", 'Int'>
     readonly reservaId: FieldRef<"Conversation", 'String'>
+    readonly reservaIds: FieldRef<"Conversation", 'Json'>
+    readonly ultimaDisponibilidadAt: FieldRef<"Conversation", 'DateTime'>
     readonly createdAt: FieldRef<"Conversation", 'DateTime'>
     readonly updatedAt: FieldRef<"Conversation", 'DateTime'>
-    readonly ultimaDisponibilidadAt: FieldRef<"Conversation", 'DateTime'>
-    readonly reservaIds: FieldRef<"Conversation", 'Json'>
   }
     
 
@@ -10874,18 +10912,20 @@ export namespace Prisma {
 
   export const ConversationScalarFieldEnum: {
     id: 'id',
+    codigo: 'codigo',
     telefono: 'telefono',
     mode: 'mode',
+    status: 'status',
     step: 'step',
     nombreCliente: 'nombreCliente',
     fechaEntrada: 'fechaEntrada',
     fechaSalida: 'fechaSalida',
     cantidadPersonas: 'cantidadPersonas',
     reservaId: 'reservaId',
-    createdAt: 'createdAt',
-    updatedAt: 'updatedAt',
+    reservaIds: 'reservaIds',
     ultimaDisponibilidadAt: 'ultimaDisponibilidadAt',
-    reservaIds: 'reservaIds'
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
   };
 
   export type ConversationScalarFieldEnum = (typeof ConversationScalarFieldEnum)[keyof typeof ConversationScalarFieldEnum]
@@ -11080,6 +11120,20 @@ export namespace Prisma {
    * Reference to a field of type 'ConversationMode[]'
    */
   export type ListEnumConversationModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ConversationMode[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'ConversationStatus'
+   */
+  export type EnumConversationStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ConversationStatus'>
+    
+
+
+  /**
+   * Reference to a field of type 'ConversationStatus[]'
+   */
+  export type ListEnumConversationStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ConversationStatus[]'>
     
 
 
@@ -11588,72 +11642,80 @@ export namespace Prisma {
     OR?: ConversationWhereInput[]
     NOT?: ConversationWhereInput | ConversationWhereInput[]
     id?: StringFilter<"Conversation"> | string
+    codigo?: StringFilter<"Conversation"> | string
     telefono?: StringFilter<"Conversation"> | string
     mode?: EnumConversationModeFilter<"Conversation"> | $Enums.ConversationMode
+    status?: EnumConversationStatusFilter<"Conversation"> | $Enums.ConversationStatus
     step?: EnumBookingStepFilter<"Conversation"> | $Enums.BookingStep
     nombreCliente?: StringNullableFilter<"Conversation"> | string | null
     fechaEntrada?: DateTimeNullableFilter<"Conversation"> | Date | string | null
     fechaSalida?: DateTimeNullableFilter<"Conversation"> | Date | string | null
     cantidadPersonas?: IntNullableFilter<"Conversation"> | number | null
     reservaId?: StringNullableFilter<"Conversation"> | string | null
+    reservaIds?: JsonNullableFilter<"Conversation">
+    ultimaDisponibilidadAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
     createdAt?: DateTimeFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeFilter<"Conversation"> | Date | string
-    ultimaDisponibilidadAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
-    reservaIds?: JsonNullableFilter<"Conversation">
     messages?: MessageListRelationFilter
   }
 
   export type ConversationOrderByWithRelationInput = {
     id?: SortOrder
+    codigo?: SortOrder
     telefono?: SortOrder
     mode?: SortOrder
+    status?: SortOrder
     step?: SortOrder
     nombreCliente?: SortOrderInput | SortOrder
     fechaEntrada?: SortOrderInput | SortOrder
     fechaSalida?: SortOrderInput | SortOrder
     cantidadPersonas?: SortOrderInput | SortOrder
     reservaId?: SortOrderInput | SortOrder
+    reservaIds?: SortOrderInput | SortOrder
+    ultimaDisponibilidadAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-    ultimaDisponibilidadAt?: SortOrderInput | SortOrder
-    reservaIds?: SortOrderInput | SortOrder
     messages?: MessageOrderByRelationAggregateInput
   }
 
   export type ConversationWhereUniqueInput = Prisma.AtLeast<{
     id?: string
+    codigo?: string
     telefono?: string
     AND?: ConversationWhereInput | ConversationWhereInput[]
     OR?: ConversationWhereInput[]
     NOT?: ConversationWhereInput | ConversationWhereInput[]
     mode?: EnumConversationModeFilter<"Conversation"> | $Enums.ConversationMode
+    status?: EnumConversationStatusFilter<"Conversation"> | $Enums.ConversationStatus
     step?: EnumBookingStepFilter<"Conversation"> | $Enums.BookingStep
     nombreCliente?: StringNullableFilter<"Conversation"> | string | null
     fechaEntrada?: DateTimeNullableFilter<"Conversation"> | Date | string | null
     fechaSalida?: DateTimeNullableFilter<"Conversation"> | Date | string | null
     cantidadPersonas?: IntNullableFilter<"Conversation"> | number | null
     reservaId?: StringNullableFilter<"Conversation"> | string | null
+    reservaIds?: JsonNullableFilter<"Conversation">
+    ultimaDisponibilidadAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
     createdAt?: DateTimeFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeFilter<"Conversation"> | Date | string
-    ultimaDisponibilidadAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
-    reservaIds?: JsonNullableFilter<"Conversation">
     messages?: MessageListRelationFilter
-  }, "id" | "telefono">
+  }, "id" | "codigo" | "telefono">
 
   export type ConversationOrderByWithAggregationInput = {
     id?: SortOrder
+    codigo?: SortOrder
     telefono?: SortOrder
     mode?: SortOrder
+    status?: SortOrder
     step?: SortOrder
     nombreCliente?: SortOrderInput | SortOrder
     fechaEntrada?: SortOrderInput | SortOrder
     fechaSalida?: SortOrderInput | SortOrder
     cantidadPersonas?: SortOrderInput | SortOrder
     reservaId?: SortOrderInput | SortOrder
+    reservaIds?: SortOrderInput | SortOrder
+    ultimaDisponibilidadAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-    ultimaDisponibilidadAt?: SortOrderInput | SortOrder
-    reservaIds?: SortOrderInput | SortOrder
     _count?: ConversationCountOrderByAggregateInput
     _avg?: ConversationAvgOrderByAggregateInput
     _max?: ConversationMaxOrderByAggregateInput
@@ -11666,18 +11728,20 @@ export namespace Prisma {
     OR?: ConversationScalarWhereWithAggregatesInput[]
     NOT?: ConversationScalarWhereWithAggregatesInput | ConversationScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"Conversation"> | string
+    codigo?: StringWithAggregatesFilter<"Conversation"> | string
     telefono?: StringWithAggregatesFilter<"Conversation"> | string
     mode?: EnumConversationModeWithAggregatesFilter<"Conversation"> | $Enums.ConversationMode
+    status?: EnumConversationStatusWithAggregatesFilter<"Conversation"> | $Enums.ConversationStatus
     step?: EnumBookingStepWithAggregatesFilter<"Conversation"> | $Enums.BookingStep
     nombreCliente?: StringNullableWithAggregatesFilter<"Conversation"> | string | null
     fechaEntrada?: DateTimeNullableWithAggregatesFilter<"Conversation"> | Date | string | null
     fechaSalida?: DateTimeNullableWithAggregatesFilter<"Conversation"> | Date | string | null
     cantidadPersonas?: IntNullableWithAggregatesFilter<"Conversation"> | number | null
     reservaId?: StringNullableWithAggregatesFilter<"Conversation"> | string | null
+    reservaIds?: JsonNullableWithAggregatesFilter<"Conversation">
+    ultimaDisponibilidadAt?: DateTimeNullableWithAggregatesFilter<"Conversation"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Conversation"> | Date | string
-    ultimaDisponibilidadAt?: DateTimeNullableWithAggregatesFilter<"Conversation"> | Date | string | null
-    reservaIds?: JsonNullableWithAggregatesFilter<"Conversation">
   }
 
   export type MessageWhereInput = {
@@ -12253,118 +12317,132 @@ export namespace Prisma {
 
   export type ConversationCreateInput = {
     id?: string
+    codigo: string
     telefono: string
     mode?: $Enums.ConversationMode
+    status?: $Enums.ConversationStatus
     step?: $Enums.BookingStep
     nombreCliente?: string | null
     fechaEntrada?: Date | string | null
     fechaSalida?: Date | string | null
     cantidadPersonas?: number | null
     reservaId?: string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
+    ultimaDisponibilidadAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-    ultimaDisponibilidadAt?: Date | string | null
-    reservaIds?: NullableJsonNullValueInput | InputJsonValue
     messages?: MessageCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationUncheckedCreateInput = {
     id?: string
+    codigo: string
     telefono: string
     mode?: $Enums.ConversationMode
+    status?: $Enums.ConversationStatus
     step?: $Enums.BookingStep
     nombreCliente?: string | null
     fechaEntrada?: Date | string | null
     fechaSalida?: Date | string | null
     cantidadPersonas?: number | null
     reservaId?: string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
+    ultimaDisponibilidadAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-    ultimaDisponibilidadAt?: Date | string | null
-    reservaIds?: NullableJsonNullValueInput | InputJsonValue
     messages?: MessageUncheckedCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: StringFieldUpdateOperationsInput | string
     telefono?: StringFieldUpdateOperationsInput | string
     mode?: EnumConversationModeFieldUpdateOperationsInput | $Enums.ConversationMode
+    status?: EnumConversationStatusFieldUpdateOperationsInput | $Enums.ConversationStatus
     step?: EnumBookingStepFieldUpdateOperationsInput | $Enums.BookingStep
     nombreCliente?: NullableStringFieldUpdateOperationsInput | string | null
     fechaEntrada?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     fechaSalida?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     cantidadPersonas?: NullableIntFieldUpdateOperationsInput | number | null
     reservaId?: NullableStringFieldUpdateOperationsInput | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
+    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    reservaIds?: NullableJsonNullValueInput | InputJsonValue
     messages?: MessageUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: StringFieldUpdateOperationsInput | string
     telefono?: StringFieldUpdateOperationsInput | string
     mode?: EnumConversationModeFieldUpdateOperationsInput | $Enums.ConversationMode
+    status?: EnumConversationStatusFieldUpdateOperationsInput | $Enums.ConversationStatus
     step?: EnumBookingStepFieldUpdateOperationsInput | $Enums.BookingStep
     nombreCliente?: NullableStringFieldUpdateOperationsInput | string | null
     fechaEntrada?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     fechaSalida?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     cantidadPersonas?: NullableIntFieldUpdateOperationsInput | number | null
     reservaId?: NullableStringFieldUpdateOperationsInput | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
+    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    reservaIds?: NullableJsonNullValueInput | InputJsonValue
     messages?: MessageUncheckedUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationCreateManyInput = {
     id?: string
+    codigo: string
     telefono: string
     mode?: $Enums.ConversationMode
+    status?: $Enums.ConversationStatus
     step?: $Enums.BookingStep
     nombreCliente?: string | null
     fechaEntrada?: Date | string | null
     fechaSalida?: Date | string | null
     cantidadPersonas?: number | null
     reservaId?: string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
+    ultimaDisponibilidadAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-    ultimaDisponibilidadAt?: Date | string | null
-    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ConversationUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: StringFieldUpdateOperationsInput | string
     telefono?: StringFieldUpdateOperationsInput | string
     mode?: EnumConversationModeFieldUpdateOperationsInput | $Enums.ConversationMode
+    status?: EnumConversationStatusFieldUpdateOperationsInput | $Enums.ConversationStatus
     step?: EnumBookingStepFieldUpdateOperationsInput | $Enums.BookingStep
     nombreCliente?: NullableStringFieldUpdateOperationsInput | string | null
     fechaEntrada?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     fechaSalida?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     cantidadPersonas?: NullableIntFieldUpdateOperationsInput | number | null
     reservaId?: NullableStringFieldUpdateOperationsInput | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
+    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ConversationUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: StringFieldUpdateOperationsInput | string
     telefono?: StringFieldUpdateOperationsInput | string
     mode?: EnumConversationModeFieldUpdateOperationsInput | $Enums.ConversationMode
+    status?: EnumConversationStatusFieldUpdateOperationsInput | $Enums.ConversationStatus
     step?: EnumBookingStepFieldUpdateOperationsInput | $Enums.BookingStep
     nombreCliente?: NullableStringFieldUpdateOperationsInput | string | null
     fechaEntrada?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     fechaSalida?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     cantidadPersonas?: NullableIntFieldUpdateOperationsInput | number | null
     reservaId?: NullableStringFieldUpdateOperationsInput | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
+    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MessageCreateInput = {
@@ -13020,6 +13098,13 @@ export namespace Prisma {
     not?: NestedEnumConversationModeFilter<$PrismaModel> | $Enums.ConversationMode
   }
 
+  export type EnumConversationStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.ConversationStatus | EnumConversationStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.ConversationStatus[] | ListEnumConversationStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ConversationStatus[] | ListEnumConversationStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumConversationStatusFilter<$PrismaModel> | $Enums.ConversationStatus
+  }
+
   export type EnumBookingStepFilter<$PrismaModel = never> = {
     equals?: $Enums.BookingStep | EnumBookingStepFieldRefInput<$PrismaModel>
     in?: $Enums.BookingStep[] | ListEnumBookingStepFieldRefInput<$PrismaModel>
@@ -13050,18 +13135,20 @@ export namespace Prisma {
 
   export type ConversationCountOrderByAggregateInput = {
     id?: SortOrder
+    codigo?: SortOrder
     telefono?: SortOrder
     mode?: SortOrder
+    status?: SortOrder
     step?: SortOrder
     nombreCliente?: SortOrder
     fechaEntrada?: SortOrder
     fechaSalida?: SortOrder
     cantidadPersonas?: SortOrder
     reservaId?: SortOrder
+    reservaIds?: SortOrder
+    ultimaDisponibilidadAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-    ultimaDisponibilidadAt?: SortOrder
-    reservaIds?: SortOrder
   }
 
   export type ConversationAvgOrderByAggregateInput = {
@@ -13070,32 +13157,36 @@ export namespace Prisma {
 
   export type ConversationMaxOrderByAggregateInput = {
     id?: SortOrder
+    codigo?: SortOrder
     telefono?: SortOrder
     mode?: SortOrder
+    status?: SortOrder
     step?: SortOrder
     nombreCliente?: SortOrder
     fechaEntrada?: SortOrder
     fechaSalida?: SortOrder
     cantidadPersonas?: SortOrder
     reservaId?: SortOrder
+    ultimaDisponibilidadAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-    ultimaDisponibilidadAt?: SortOrder
   }
 
   export type ConversationMinOrderByAggregateInput = {
     id?: SortOrder
+    codigo?: SortOrder
     telefono?: SortOrder
     mode?: SortOrder
+    status?: SortOrder
     step?: SortOrder
     nombreCliente?: SortOrder
     fechaEntrada?: SortOrder
     fechaSalida?: SortOrder
     cantidadPersonas?: SortOrder
     reservaId?: SortOrder
+    ultimaDisponibilidadAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-    ultimaDisponibilidadAt?: SortOrder
   }
 
   export type ConversationSumOrderByAggregateInput = {
@@ -13110,6 +13201,16 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumConversationModeFilter<$PrismaModel>
     _max?: NestedEnumConversationModeFilter<$PrismaModel>
+  }
+
+  export type EnumConversationStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ConversationStatus | EnumConversationStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.ConversationStatus[] | ListEnumConversationStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ConversationStatus[] | ListEnumConversationStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumConversationStatusWithAggregatesFilter<$PrismaModel> | $Enums.ConversationStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumConversationStatusFilter<$PrismaModel>
+    _max?: NestedEnumConversationStatusFilter<$PrismaModel>
   }
 
   export type EnumBookingStepWithAggregatesFilter<$PrismaModel = never> = {
@@ -13410,6 +13511,10 @@ export namespace Prisma {
 
   export type EnumConversationModeFieldUpdateOperationsInput = {
     set?: $Enums.ConversationMode
+  }
+
+  export type EnumConversationStatusFieldUpdateOperationsInput = {
+    set?: $Enums.ConversationStatus
   }
 
   export type EnumBookingStepFieldUpdateOperationsInput = {
@@ -13752,6 +13857,13 @@ export namespace Prisma {
     not?: NestedEnumConversationModeFilter<$PrismaModel> | $Enums.ConversationMode
   }
 
+  export type NestedEnumConversationStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.ConversationStatus | EnumConversationStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.ConversationStatus[] | ListEnumConversationStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ConversationStatus[] | ListEnumConversationStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumConversationStatusFilter<$PrismaModel> | $Enums.ConversationStatus
+  }
+
   export type NestedEnumBookingStepFilter<$PrismaModel = never> = {
     equals?: $Enums.BookingStep | EnumBookingStepFieldRefInput<$PrismaModel>
     in?: $Enums.BookingStep[] | ListEnumBookingStepFieldRefInput<$PrismaModel>
@@ -13767,6 +13879,16 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumConversationModeFilter<$PrismaModel>
     _max?: NestedEnumConversationModeFilter<$PrismaModel>
+  }
+
+  export type NestedEnumConversationStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ConversationStatus | EnumConversationStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.ConversationStatus[] | ListEnumConversationStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ConversationStatus[] | ListEnumConversationStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumConversationStatusWithAggregatesFilter<$PrismaModel> | $Enums.ConversationStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumConversationStatusFilter<$PrismaModel>
+    _max?: NestedEnumConversationStatusFilter<$PrismaModel>
   }
 
   export type NestedEnumBookingStepWithAggregatesFilter<$PrismaModel = never> = {
@@ -14299,34 +14421,38 @@ export namespace Prisma {
 
   export type ConversationCreateWithoutMessagesInput = {
     id?: string
+    codigo: string
     telefono: string
     mode?: $Enums.ConversationMode
+    status?: $Enums.ConversationStatus
     step?: $Enums.BookingStep
     nombreCliente?: string | null
     fechaEntrada?: Date | string | null
     fechaSalida?: Date | string | null
     cantidadPersonas?: number | null
     reservaId?: string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
+    ultimaDisponibilidadAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-    ultimaDisponibilidadAt?: Date | string | null
-    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ConversationUncheckedCreateWithoutMessagesInput = {
     id?: string
+    codigo: string
     telefono: string
     mode?: $Enums.ConversationMode
+    status?: $Enums.ConversationStatus
     step?: $Enums.BookingStep
     nombreCliente?: string | null
     fechaEntrada?: Date | string | null
     fechaSalida?: Date | string | null
     cantidadPersonas?: number | null
     reservaId?: string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
+    ultimaDisponibilidadAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
-    ultimaDisponibilidadAt?: Date | string | null
-    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ConversationCreateOrConnectWithoutMessagesInput = {
@@ -14347,34 +14473,38 @@ export namespace Prisma {
 
   export type ConversationUpdateWithoutMessagesInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: StringFieldUpdateOperationsInput | string
     telefono?: StringFieldUpdateOperationsInput | string
     mode?: EnumConversationModeFieldUpdateOperationsInput | $Enums.ConversationMode
+    status?: EnumConversationStatusFieldUpdateOperationsInput | $Enums.ConversationStatus
     step?: EnumBookingStepFieldUpdateOperationsInput | $Enums.BookingStep
     nombreCliente?: NullableStringFieldUpdateOperationsInput | string | null
     fechaEntrada?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     fechaSalida?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     cantidadPersonas?: NullableIntFieldUpdateOperationsInput | number | null
     reservaId?: NullableStringFieldUpdateOperationsInput | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
+    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ConversationUncheckedUpdateWithoutMessagesInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: StringFieldUpdateOperationsInput | string
     telefono?: StringFieldUpdateOperationsInput | string
     mode?: EnumConversationModeFieldUpdateOperationsInput | $Enums.ConversationMode
+    status?: EnumConversationStatusFieldUpdateOperationsInput | $Enums.ConversationStatus
     step?: EnumBookingStepFieldUpdateOperationsInput | $Enums.BookingStep
     nombreCliente?: NullableStringFieldUpdateOperationsInput | string | null
     fechaEntrada?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     fechaSalida?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     cantidadPersonas?: NullableIntFieldUpdateOperationsInput | number | null
     reservaId?: NullableStringFieldUpdateOperationsInput | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
+    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ReservaCreateManyHabitacionInput = {

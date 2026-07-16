@@ -4,38 +4,100 @@ import { app } from "./app.js";
 import { prisma } from "./lib/prisma.js";
 import { iniciarWhatsApp } from "./whatsapp/client.js";
 
-const PORT = process.env.PORT || 3000;
+import {
+  iniciarSchedulerConversaciones,
+  detenerSchedulerConversaciones,
+} from "./conversations/scheduler.js";
+const PORT = Number(process.env.PORT) || 3000;
 
-async function startServer() {
+let servidor = null;
+let cerrando = false;
+
+async function iniciarServidor() {
   try {
     await prisma.$connect();
 
-    console.log(
-      "✅ Conexión a PostgreSQL establecida"
-    );
+    console.log("✅ Base de datos conectada");
 
-    app.listen(PORT, async () => {
+    servidor = app.listen(PORT, () => {
       console.log(
         `✅ Servidor ejecutándose en http://localhost:${PORT}`
       );
-
-      try {
-        await iniciarWhatsApp();
-      } catch (error) {
-        console.error(
-          "❌ Error iniciando WhatsApp:",
-          error
-        );
-      }
     });
+
+    iniciarSchedulerConversaciones();
+
+    await iniciarWhatsApp();
   } catch (error) {
     console.error(
-      "❌ No se pudo iniciar el servidor:",
+      "❌ Error iniciando el servidor:",
       error
     );
+
+    detenerSchedulerConversaciones();
+
+    await prisma.$disconnect().catch(() => {});
 
     process.exit(1);
   }
 }
 
-startServer();
+async function cerrarServidor(signal) {
+  if (cerrando) {
+    return;
+  }
+
+  cerrando = true;
+
+  console.log(
+    `\n🛑 Cerrando servidor por ${signal}...`
+  );
+
+  detenerSchedulerConversaciones();
+
+  if (servidor) {
+    await new Promise((resolve) => {
+      servidor.close(() => {
+        console.log("✅ Servidor HTTP cerrado");
+        resolve();
+      });
+    });
+  }
+
+  await prisma.$disconnect().catch((error) => {
+    console.error(
+      "❌ Error desconectando Prisma:",
+      error
+    );
+  });
+
+  console.log("✅ Servidor cerrado");
+
+  process.exit(0);
+}
+
+process.on("SIGINT", () => {
+  cerrarServidor("SIGINT");
+});
+
+process.on("SIGTERM", () => {
+  cerrarServidor("SIGTERM");
+});
+
+process.on("unhandledRejection", (error) => {
+  console.error(
+    "❌ Promesa no controlada:",
+    error
+  );
+});
+
+process.on("uncaughtException", (error) => {
+  console.error(
+    "❌ Error no controlado:",
+    error
+  );
+
+  cerrarServidor("uncaughtException");
+});
+
+iniciarServidor();

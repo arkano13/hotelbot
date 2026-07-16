@@ -161,32 +161,40 @@ model ImagenHabitacion {
 
   @@map("imagenes_habitacion")
 }
-
-model Conversation {
-  id String @id @default(uuid())
-
-  telefono String @unique
-
-  mode ConversationMode @default(BOT)
-  step BookingStep      @default(INICIO)
-
-  nombreCliente    String?
-  fechaEntrada     DateTime?
-  fechaSalida      DateTime?
-  cantidadPersonas Int?
-
-  reservaId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ultimaDisponibilidadAt DateTime?
-  reservaIds Json?
-
-  messages Message[]
-
-  @@map("conversations")
+enum ConversationStatus {
+  ACTIVA
+  FINALIZADA
 }
 
+model Conversation {
+  id                     String             @id @default(uuid())
+  codigo                 String             @unique
+
+  telefono               String             @unique
+
+  mode                   ConversationMode   @default(BOT)
+  status                 ConversationStatus @default(ACTIVA)
+  step                   BookingStep        @default(INICIO)
+
+  nombreCliente          String?
+  fechaEntrada           DateTime?
+  fechaSalida            DateTime?
+  cantidadPersonas       Int?
+
+  reservaId              String?
+  reservaIds             Json?
+
+  ultimaDisponibilidadAt DateTime?
+
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  messages               Message[]
+
+  @@index([status])
+  @@index([updatedAt])
+  @@index([mode])
+}
 model Message {
   id String @id @default(uuid())
 
