@@ -1,10 +1,18 @@
 import { obtenerTarifaPorPersonas } from "../tarifas/service.js";
-import { consultarDisponibilidad } from "../disponibilidad/service.js";
-import { crearReservaTemporal } from "../reservas/service.js";
+import {
+  consultarDisponibilidad,
+  consultarDisponibilidadMultiple,
+} from "../disponibilidad/service.js";
+import {
+  crearReservaTemporal,
+  crearReservasMultiples,
+} from "../reservas/service.js";
+import { obtenerImagenesHabitacion } from "../imagenes/service.js";
 
 import {
   actualizarEstadoConversacion,
   obtenerConversacionPorId,
+  reiniciarDatosReserva,
 } from "../conversations/service.js";
 
 function formatearFecha(fecha) {
@@ -16,23 +24,16 @@ function calcularNoches(fechaEntrada, fechaSalida) {
   const salida = new Date(`${fechaSalida}T00:00:00`);
 
   return Math.round(
-    (salida.getTime() - entrada.getTime()) /
-      (1000 * 60 * 60 * 24)
+    (salida.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24),
   );
 }
 
-export async function ejecutarTool(
-  nombre,
-  argumentos = {},
-  contexto = {}
-) {
-  const { conversationId, telefono } = contexto;
+export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
+  const { conversationId, telefono, socket, jid } = contexto;
 
   switch (nombre) {
     case "consultar_tarifas": {
-      const tarifa = await obtenerTarifaPorPersonas(
-        argumentos.personas
-      );
+      const tarifa = await obtenerTarifaPorPersonas(argumentos.personas);
 
       return {
         personas: tarifa.personas,
@@ -52,10 +53,7 @@ export async function ejecutarTool(
         personas,
       });
 
-      const cantidadNoches = calcularNoches(
-        fechaEntrada,
-        fechaSalida
-      );
+      const cantidadNoches = calcularNoches(fechaEntrada, fechaSalida);
 
       let precioPorNoche = null;
       let precioTotal = null;
@@ -69,12 +67,8 @@ export async function ejecutarTool(
 
       if (conversationId) {
         await actualizarEstadoConversacion(conversationId, {
-          fechaEntrada: new Date(
-            `${fechaEntrada}T00:00:00`
-          ),
-          fechaSalida: new Date(
-            `${fechaSalida}T00:00:00`
-          ),
+          fechaEntrada: new Date(`${fechaEntrada}T00:00:00`),
+          fechaSalida: new Date(`${fechaSalida}T00:00:00`),
           cantidadPersonas: personas,
           ultimaDisponibilidadAt: new Date(),
           nombreCliente: null,
@@ -100,34 +94,28 @@ export async function ejecutarTool(
 
     case "crear_reserva": {
       if (!conversationId) {
-        throw new Error(
-          "No se encontró la conversación actual"
-        );
+        throw new Error("No se encontró la conversación actual");
       }
 
       if (!telefono) {
-        throw new Error(
-          "No se encontró el teléfono del cliente"
-        );
+        throw new Error("No se encontró el teléfono del cliente");
       }
 
-      const conversacion =
-        await obtenerConversacionPorId(conversationId);
+      const conversacion = await obtenerConversacionPorId(conversationId);
 
       if (!conversacion.ultimaDisponibilidadAt) {
         throw new Error(
-          "Primero debes consultar disponibilidad para las fechas actuales"
+          "Primero debemos revisar la disponibilidad para las fechas actuales",
         );
       }
 
       const minutosDesdeConsulta =
-        (Date.now() -
-          conversacion.ultimaDisponibilidadAt.getTime()) /
+        (Date.now() - conversacion.ultimaDisponibilidadAt.getTime()) /
         (1000 * 60);
 
       if (minutosDesdeConsulta > 10) {
         throw new Error(
-          "La consulta de disponibilidad venció. Debemos revisar nuevamente las fechas"
+          "La consulta de disponibilidad venció. Debemos revisar nuevamente",
         );
       }
 
@@ -136,36 +124,22 @@ export async function ejecutarTool(
         !conversacion.fechaSalida ||
         !conversacion.cantidadPersonas
       ) {
-        throw new Error(
-          "Faltan las fechas o la cantidad de personas"
-        );
+        throw new Error("Faltan las fechas o la cantidad de personas");
       }
 
-      if (
-        conversacion.step !== "ESPERANDO_CONFIRMACION"
-      ) {
-        throw new Error(
-          "La reserva todavía no está lista para confirmarse"
-        );
+      if (conversacion.step !== "ESPERANDO_CONFIRMACION") {
+        throw new Error("La reserva todavía no está lista para confirmarse");
       }
 
-      const nombre = String(
-        argumentos.nombre ?? ""
-      ).trim();
+      const nombre = String(argumentos.nombre ?? "").trim();
 
       if (!nombre) {
-        throw new Error(
-          "El nombre del cliente es obligatorio"
-        );
+        throw new Error("El nombre y apellido son obligatorios");
       }
 
-      const fechaEntrada = formatearFecha(
-        conversacion.fechaEntrada
-      );
+      const fechaEntrada = formatearFecha(conversacion.fechaEntrada);
 
-      const fechaSalida = formatearFecha(
-        conversacion.fechaSalida
-      );
+      const fechaSalida = formatearFecha(conversacion.fechaSalida);
 
       const reserva = await crearReservaTemporal({
         nombre,
@@ -175,39 +149,141 @@ export async function ejecutarTool(
         personas: conversacion.cantidadPersonas,
       });
 
-      await actualizarEstadoConversacion(
-        conversationId,
-        {
-          nombreCliente: nombre,
-          reservaId: reserva.id,
-          step: "ESPERANDO_PAGO",
-          ultimaDisponibilidadAt: null,
-        }
-      );
+      await actualizarEstadoConversacion(conversationId, {
+        nombreCliente: nombre,
+        reservaId: reserva.id,
+        step: "ESPERANDO_PAGO",
+        ultimaDisponibilidadAt: null,
+      });
 
       return {
         codigo: reserva.codigo,
         nombreCliente: nombre,
-        fechaEntrada: formatearFecha(
-          reserva.fechaEntrada
-        ),
-        fechaSalida: formatearFecha(
-          reserva.fechaSalida
-        ),
+        fechaEntrada: formatearFecha(reserva.fechaEntrada),
+        fechaSalida: formatearFecha(reserva.fechaSalida),
         personas: reserva.cantidadPersonas,
         noches: reserva.cantidadNoches,
-        precioPorNoche: Number(
-          reserva.precioPorNoche
-        ),
-        precioTotal: Number(
-          reserva.precioTotal
-        ),
+        precioPorNoche: Number(reserva.precioPorNoche),
+        precioTotal: Number(reserva.precioTotal),
         moneda: "HNL",
         estado: reserva.estado,
       };
     }
 
+    case "iniciar_nueva_reserva": {
+      if (!conversationId) {
+        throw new Error("No se encontró la conversación actual");
+      }
+
+      await reiniciarDatosReserva(conversationId);
+
+      return {
+        reiniciada: true,
+        mensaje:
+          "Los datos anteriores fueron eliminados. Podemos comenzar una nueva reserva.",
+      };
+    }
+
+    case "enviar_fotos": {
+      if (!socket || !jid) {
+        throw new Error("No se pudo acceder al chat de WhatsApp");
+      }
+
+      const imagenes = await obtenerImagenesHabitacion();
+
+      for (let i = 0; i < imagenes.length; i++) {
+        const imagen = imagenes[i];
+
+        await socket.sendMessage(jid, {
+          image: {
+            url: imagen.url,
+          },
+          caption:
+            i === 0
+              ? "Estas son algunas fotos de nuestras habitaciones."
+              : undefined,
+        });
+      }
+
+      return {
+        enviadas: true,
+        cantidad: imagenes.length,
+      };
+    }
+    case "buscar_disponibilidad_multiple": {
+      const fechaEntrada = argumentos.fechaEntrada;
+      const fechaSalida = argumentos.fechaSalida;
+      const personas = Number(argumentos.personas);
+
+      const resultado = await consultarDisponibilidadMultiple({
+        fechaEntrada,
+        fechaSalida,
+        personas,
+      });
+
+      const cantidadNoches = calcularNoches(fechaEntrada, fechaSalida);
+
+      let precioTotalPorNoche = 0;
+
+      if (resultado.disponible) {
+        for (const capacidad of resultado.distribucion) {
+          const tarifa = await obtenerTarifaPorPersonas(capacidad);
+
+          precioTotalPorNoche += Number(tarifa.precio);
+        }
+      }
+
+      return {
+        disponible: resultado.disponible,
+        personas,
+        distribucion: resultado.distribucion,
+        totalHabitaciones: resultado.totalHabitaciones,
+        cantidadNoches,
+        precioTotalPorNoche: resultado.disponible ? precioTotalPorNoche : null,
+        precioTotal: resultado.disponible
+          ? precioTotalPorNoche * cantidadNoches
+          : null,
+        moneda: "HNL",
+      };
+    }
+    case "crear_reservas_multiples": {
+      if (!conversationId || !telefono) {
+        throw new Error("No se encontró la conversación actual");
+      }
+
+      const nombre = String(argumentos.nombre ?? "").trim();
+
+      if (!nombre) {
+        throw new Error("El nombre y apellido son obligatorios");
+      }
+
+      const reservas = await crearReservasMultiples({
+        nombre,
+        telefono,
+        fechaEntrada: argumentos.fechaEntrada,
+        fechaSalida: argumentos.fechaSalida,
+        personas: Number(argumentos.personas),
+      });
+
+      await actualizarEstadoConversacion(conversationId, {
+        nombreCliente: nombre,
+        reservaIds: reservas.map((reserva) => reserva.id),
+        step: "ESPERANDO_PAGO",
+      });
+
+      return {
+        cantidadReservas: reservas.length,
+        codigos: reservas.map((reserva) => reserva.codigo),
+        distribucion: reservas.map((reserva) => reserva.cantidadPersonas),
+        precioTotal: reservas.reduce(
+          (total, reserva) => total + Number(reserva.precioTotal),
+          0,
+        ),
+        moneda: "HNL",
+      };
+    }
+
     default:
-      throw new Error(`Tool no reconocida: ${nombre}`);
+      throw new Error(`Herramienta no reconocida: ${nombre}`);
   }
 }

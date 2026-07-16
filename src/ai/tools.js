@@ -36,11 +36,7 @@ export const hotelTools = [
               description: "Cantidad de personas: 1, 2 o 3.",
             },
           },
-          required: [
-            "fechaEntrada",
-            "fechaSalida",
-            "personas",
-          ],
+          required: ["fechaEntrada", "fechaSalida", "personas"],
         },
       },
       {
@@ -59,6 +55,76 @@ export const hotelTools = [
           required: ["nombre"],
         },
       },
+      {
+        name: "iniciar_nueva_reserva",
+        description:
+          "Limpia los datos anteriores cuando el cliente quiere iniciar otra reserva o corregir completamente una reserva anterior.",
+        parameters: {
+          type: "OBJECT",
+          properties: {},
+        },
+      },
+      {
+        name: "enviar_fotos",
+        description:
+          "Envía las fotografías de las habitaciones únicamente cuando el cliente las solicita.",
+        parameters: {
+          type: "OBJECT",
+          properties: {},
+        },
+      },
+      {
+        name: "buscar_disponibilidad_multiple",
+        description:
+          "Busca varias habitaciones para grupos de 4 personas o más.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            fechaEntrada: {
+              type: "STRING",
+              description: "Fecha interna de entrada en formato YYYY-MM-DD.",
+            },
+            fechaSalida: {
+              type: "STRING",
+              description: "Fecha interna de salida en formato YYYY-MM-DD.",
+            },
+            personas: {
+              type: "NUMBER",
+              description: "Cantidad total de personas, mínimo 4.",
+            },
+          },
+          required: ["fechaEntrada", "fechaSalida", "personas"],
+        },
+      },
+      {
+  name: "crear_reservas_multiples",
+  description:
+    "Crea varias reservas para un grupo de 4 personas o más, después de confirmar disponibilidad, recibir confirmación y obtener nombre y apellido.",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      nombre: {
+        type: "STRING",
+        description: "Nombre y apellido del cliente.",
+      },
+      fechaEntrada: {
+        type: "STRING",
+      },
+      fechaSalida: {
+        type: "STRING",
+      },
+      personas: {
+        type: "NUMBER",
+      },
+    },
+    required: [
+      "nombre",
+      "fechaEntrada",
+      "fechaSalida",
+      "personas",
+    ],
+  },
+},
     ],
   },
 ];

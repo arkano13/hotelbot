@@ -26,12 +26,7 @@ function obtenerTextoMensaje(message) {
   ).trim();
 }
 
-async function procesarMensajesAgrupados({
-  socket,
-  jid,
-  telefono,
-  textos,
-}) {
+async function procesarMensajesAgrupados({ socket, jid, telefono, textos }) {
   const textoCompleto = textos.join(" ").trim();
 
   if (!textoCompleto) {
@@ -40,8 +35,7 @@ async function procesarMensajesAgrupados({
 
   console.log(`📩 ${telefono}: ${textoCompleto}`);
 
-  const conversacion =
-    await obtenerOCrearConversacion(telefono);
+  const conversacion = await obtenerOCrearConversacion(telefono);
 
   await guardarMensaje({
     conversationId: conversacion.id,
@@ -50,36 +44,31 @@ async function procesarMensajesAgrupados({
   });
 
   if (conversacion.mode === "HUMANO") {
-    console.log(
-      `👤 Conversación ${telefono} está en modo HUMANO`
-    );
+    console.log(`👤 Conversación ${telefono} está en modo HUMANO`);
 
     return;
   }
 
-  const conversacionConHistorial =
-    await obtenerConversacionConHistorial(
-      telefono,
-      15
-    );
+  const conversacionConHistorial = await obtenerConversacionConHistorial(
+    telefono,
+    15,
+  );
 
   let respuesta;
 
   try {
-    respuesta = await generarRespuestaGemini({
-      messages:
-        conversacionConHistorial?.messages ?? [],
-      step:
-        conversacionConHistorial?.step ??
-        conversacion.step,
-      telefono,
-      conversationId: conversacion.id,
-    });
+respuesta = await generarRespuestaGemini({
+  messages: conversacionConHistorial?.messages ?? [],
+  step:
+    conversacionConHistorial?.step ??
+    conversacion.step,
+  telefono,
+  conversationId: conversacion.id,
+  socket,
+  jid,
+});
   } catch (error) {
-    console.error(
-      "❌ Error generando respuesta con Gemini:",
-      error
-    );
+    console.error("❌ Error generando respuesta con Gemini:", error);
 
     if (error?.status === 429) {
       respuesta =
@@ -108,21 +97,14 @@ async function procesarMensajesAgrupados({
   console.log(`🤖 ${telefono}: ${respuesta}`);
 }
 
-export async function manejarMensajeEntrante({
-  socket,
-  message,
-}) {
+export async function manejarMensajeEntrante({ socket, message }) {
   if (!message?.message || message.key?.fromMe) {
     return;
   }
 
   const jid = message.key?.remoteJid;
 
-  if (
-    !jid ||
-    jid === "status@broadcast" ||
-    jid.endsWith("@g.us")
-  ) {
+  if (!jid || jid === "status@broadcast" || jid.endsWith("@g.us")) {
     return;
   }
 
@@ -162,22 +144,10 @@ export async function manejarMensajeEntrante({
         textos: datos.textos,
       });
     } catch (error) {
-      console.error(
-        "❌ Error procesando mensajes:",
-        error
-      );
-      if (error?.status === 429) {
-  respuesta =
-    "El asistente alcanzó temporalmente su límite de uso. Intenta nuevamente más tarde.";
-} else if (error?.status === 503 || error?.status === 504) {
-  respuesta =
-    "El asistente está temporalmente ocupado. Por favor, intenta nuevamente en unos momentos.";
-} else {
-  respuesta =
-    "Disculpa, tuve un problema al procesar tu mensaje. Inténtalo nuevamente.";
-}
+      console.error("❌ Error procesando mensajes:", error);
     }
   }, TIEMPO_ESPERA);
 
   mensajesPendientes.set(jid, pendiente);
 }
+

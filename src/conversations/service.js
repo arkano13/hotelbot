@@ -75,3 +75,23 @@ export async function obtenerConversacionPorId(id) {
 
   return conversacion;
 }
+export async function reiniciarDatosReserva(conversationId) {
+  if (!conversationId) {
+    throw new Error("El ID de la conversación es obligatorio");
+  }
+
+  return prisma.conversation.update({
+    where: {
+      id: conversationId,
+    },
+    data: {
+      step: "INICIO",
+      fechaEntrada: null,
+      fechaSalida: null,
+      cantidadPersonas: null,
+      nombreCliente: null,
+      reservaId: null,
+      ultimaDisponibilidadAt: null,
+    },
+  });
+}

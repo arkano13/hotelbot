@@ -8538,6 +8538,7 @@ export namespace Prisma {
     createdAt: number
     updatedAt: number
     ultimaDisponibilidadAt: number
+    reservaIds: number
     _all: number
   }
 
@@ -8593,6 +8594,7 @@ export namespace Prisma {
     createdAt?: true
     updatedAt?: true
     ultimaDisponibilidadAt?: true
+    reservaIds?: true
     _all?: true
   }
 
@@ -8695,6 +8697,7 @@ export namespace Prisma {
     createdAt: Date
     updatedAt: Date
     ultimaDisponibilidadAt: Date | null
+    reservaIds: JsonValue | null
     _count: ConversationCountAggregateOutputType | null
     _avg: ConversationAvgAggregateOutputType | null
     _sum: ConversationSumAggregateOutputType | null
@@ -8729,6 +8732,7 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     ultimaDisponibilidadAt?: boolean
+    reservaIds?: boolean
     messages?: boolean | Conversation$messagesArgs<ExtArgs>
     _count?: boolean | ConversationCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["conversation"]>
@@ -8746,6 +8750,7 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     ultimaDisponibilidadAt?: boolean
+    reservaIds?: boolean
   }, ExtArgs["result"]["conversation"]>
 
   export type ConversationSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -8761,6 +8766,7 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     ultimaDisponibilidadAt?: boolean
+    reservaIds?: boolean
   }, ExtArgs["result"]["conversation"]>
 
   export type ConversationSelectScalar = {
@@ -8776,9 +8782,10 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     ultimaDisponibilidadAt?: boolean
+    reservaIds?: boolean
   }
 
-  export type ConversationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "telefono" | "mode" | "step" | "nombreCliente" | "fechaEntrada" | "fechaSalida" | "cantidadPersonas" | "reservaId" | "createdAt" | "updatedAt" | "ultimaDisponibilidadAt", ExtArgs["result"]["conversation"]>
+  export type ConversationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "telefono" | "mode" | "step" | "nombreCliente" | "fechaEntrada" | "fechaSalida" | "cantidadPersonas" | "reservaId" | "createdAt" | "updatedAt" | "ultimaDisponibilidadAt" | "reservaIds", ExtArgs["result"]["conversation"]>
   export type ConversationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     messages?: boolean | Conversation$messagesArgs<ExtArgs>
     _count?: boolean | ConversationCountOutputTypeDefaultArgs<ExtArgs>
@@ -8804,6 +8811,7 @@ export namespace Prisma {
       createdAt: Date
       updatedAt: Date
       ultimaDisponibilidadAt: Date | null
+      reservaIds: Prisma.JsonValue | null
     }, ExtArgs["result"]["conversation"]>
     composites: {}
   }
@@ -9240,6 +9248,7 @@ export namespace Prisma {
     readonly createdAt: FieldRef<"Conversation", 'DateTime'>
     readonly updatedAt: FieldRef<"Conversation", 'DateTime'>
     readonly ultimaDisponibilidadAt: FieldRef<"Conversation", 'DateTime'>
+    readonly reservaIds: FieldRef<"Conversation", 'Json'>
   }
     
 
@@ -10875,7 +10884,8 @@ export namespace Prisma {
     reservaId: 'reservaId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
-    ultimaDisponibilidadAt: 'ultimaDisponibilidadAt'
+    ultimaDisponibilidadAt: 'ultimaDisponibilidadAt',
+    reservaIds: 'reservaIds'
   };
 
   export type ConversationScalarFieldEnum = (typeof ConversationScalarFieldEnum)[keyof typeof ConversationScalarFieldEnum]
@@ -11589,6 +11599,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeFilter<"Conversation"> | Date | string
     ultimaDisponibilidadAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
+    reservaIds?: JsonNullableFilter<"Conversation">
     messages?: MessageListRelationFilter
   }
 
@@ -11605,6 +11616,7 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     ultimaDisponibilidadAt?: SortOrderInput | SortOrder
+    reservaIds?: SortOrderInput | SortOrder
     messages?: MessageOrderByRelationAggregateInput
   }
 
@@ -11624,6 +11636,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeFilter<"Conversation"> | Date | string
     ultimaDisponibilidadAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
+    reservaIds?: JsonNullableFilter<"Conversation">
     messages?: MessageListRelationFilter
   }, "id" | "telefono">
 
@@ -11640,6 +11653,7 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     ultimaDisponibilidadAt?: SortOrderInput | SortOrder
+    reservaIds?: SortOrderInput | SortOrder
     _count?: ConversationCountOrderByAggregateInput
     _avg?: ConversationAvgOrderByAggregateInput
     _max?: ConversationMaxOrderByAggregateInput
@@ -11663,6 +11677,7 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Conversation"> | Date | string
     ultimaDisponibilidadAt?: DateTimeNullableWithAggregatesFilter<"Conversation"> | Date | string | null
+    reservaIds?: JsonNullableWithAggregatesFilter<"Conversation">
   }
 
   export type MessageWhereInput = {
@@ -12249,6 +12264,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     ultimaDisponibilidadAt?: Date | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
     messages?: MessageCreateNestedManyWithoutConversationInput
   }
 
@@ -12265,6 +12281,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     ultimaDisponibilidadAt?: Date | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
     messages?: MessageUncheckedCreateNestedManyWithoutConversationInput
   }
 
@@ -12281,6 +12298,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
     messages?: MessageUpdateManyWithoutConversationNestedInput
   }
 
@@ -12297,6 +12315,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
     messages?: MessageUncheckedUpdateManyWithoutConversationNestedInput
   }
 
@@ -12313,6 +12332,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     ultimaDisponibilidadAt?: Date | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ConversationUpdateManyMutationInput = {
@@ -12328,6 +12348,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ConversationUncheckedUpdateManyInput = {
@@ -12343,6 +12364,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MessageCreateInput = {
@@ -13039,6 +13061,7 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     ultimaDisponibilidadAt?: SortOrder
+    reservaIds?: SortOrder
   }
 
   export type ConversationAvgOrderByAggregateInput = {
@@ -14287,6 +14310,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     ultimaDisponibilidadAt?: Date | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ConversationUncheckedCreateWithoutMessagesInput = {
@@ -14302,6 +14326,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     ultimaDisponibilidadAt?: Date | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ConversationCreateOrConnectWithoutMessagesInput = {
@@ -14333,6 +14358,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ConversationUncheckedUpdateWithoutMessagesInput = {
@@ -14348,6 +14374,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     ultimaDisponibilidadAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reservaIds?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type ReservaCreateManyHabitacionInput = {

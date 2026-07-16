@@ -180,6 +180,7 @@ model Conversation {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
   ultimaDisponibilidadAt DateTime?
+  reservaIds             Json?
 
   messages Message[]
 
