@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
-import path from "path";
+
+import { UPLOADS_DIR } from "./lib/paths.js";
 
 import tarifasRoutes from "./tarifas/routes.js";
 import clientesRoutes from "./clientes/routes.js";
@@ -25,10 +26,7 @@ app.use(
 );
 
 app.use(express.json());
-app.use(
-  "/uploads",
-  express.static(path.join(process.cwd(), "uploads"))
-);
+app.use("/uploads", express.static(UPLOADS_DIR));
 
 app.get("/", (req, res) => {
   res.json({

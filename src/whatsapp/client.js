@@ -10,12 +10,18 @@ import {
   manejarMensajeEntrante,
 } from "./messageHandler.js";
 
+import { enviarAlerta } from "../lib/alertas.js";
+import { AUTH_DIR } from "../lib/paths.js";
+
 const logger = pino({
   level: "silent",
 });
 
 let socket = null;
 let iniciando = false;
+let intentosReconexionFallidos = 0;
+
+const UMBRAL_ALERTA_RECONEXION = 5;
 
 export async function iniciarWhatsApp() {
   if (iniciando) {
@@ -27,7 +33,7 @@ export async function iniciarWhatsApp() {
   try {
     const { state, saveCreds } =
       await useMultiFileAuthState(
-        "auth_info_baileys"
+        AUTH_DIR
       );
 
     socket = makeWASocket({
@@ -59,6 +65,7 @@ export async function iniciarWhatsApp() {
 
         if (connection === "open") {
           iniciando = false;
+          intentosReconexionFallidos = 0;
 
           console.log("✅ WhatsApp conectado");
         }
@@ -81,7 +88,26 @@ export async function iniciarWhatsApp() {
               "La sesión fue cerrada. Borra auth_info_baileys y vuelve a escanear."
             );
 
+            enviarAlerta(
+              "whatsapp-sesion-cerrada",
+              "WhatsApp: sesión cerrada",
+              "La sesión de WhatsApp del bot se cerró. Hay que volver a escanear el código QR desde el servidor para reconectar."
+            ).catch(console.error);
+
             return;
+          }
+
+          intentosReconexionFallidos += 1;
+
+          if (
+            intentosReconexionFallidos ===
+            UMBRAL_ALERTA_RECONEXION
+          ) {
+            enviarAlerta(
+              "whatsapp-reconexion-fallida",
+              "WhatsApp: problemas de conexión",
+              `El bot lleva ${UMBRAL_ALERTA_RECONEXION} intentos seguidos sin poder reconectarse a WhatsApp. Revisa el servidor.`
+            ).catch(console.error);
           }
 
           console.log(

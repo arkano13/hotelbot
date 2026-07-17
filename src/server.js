@@ -14,6 +14,11 @@ import {
   detenerSchedulerReportes,
 } from "./reportes/scheduler.js";
 
+import {
+  iniciarSchedulerBackups,
+  detenerSchedulerBackups,
+} from "./backups/scheduler.js";
+
 const PORT = Number(process.env.PORT) || 3000;
 
 let servidor = null;
@@ -33,6 +38,7 @@ async function iniciarServidor() {
 
     iniciarSchedulerConversaciones();
     iniciarSchedulerReportes();
+    iniciarSchedulerBackups();
 
     await iniciarWhatsApp();
   } catch (error) {
@@ -43,6 +49,7 @@ async function iniciarServidor() {
 
     detenerSchedulerConversaciones();
     detenerSchedulerReportes();
+    detenerSchedulerBackups();
 
     await prisma.$disconnect().catch(() => {});
 
@@ -63,6 +70,7 @@ async function cerrarServidor(signal) {
 
   detenerSchedulerConversaciones();
   detenerSchedulerReportes();
+  detenerSchedulerBackups();
 
   if (servidor) {
     await new Promise((resolve) => {

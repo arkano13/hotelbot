@@ -642,3 +642,46 @@ export async function obtenerReservaPorCodigo(
 
   return reserva;
 }
+
+export async function liberarReservaPorCodigo(codigo) {
+  const codigoLimpio = String(codigo ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (!codigoLimpio) {
+    throw new Error("El código de reserva es obligatorio");
+  }
+
+  const reserva = await prisma.reserva.findUnique({
+    where: {
+      codigo: codigoLimpio,
+    },
+    include: {
+      cliente: true,
+      habitacion: true,
+    },
+  });
+
+  if (!reserva) {
+    throw new Error("Reserva no encontrada");
+  }
+
+  if (!["CONFIRMADA", "CHECK_IN"].includes(reserva.estado)) {
+    throw new Error(
+      `Esta reserva está en estado ${reserva.estado} y no se puede liberar`
+    );
+  }
+
+  return prisma.reserva.update({
+    where: {
+      id: reserva.id,
+    },
+    data: {
+      estado: "CHECK_OUT",
+    },
+    include: {
+      cliente: true,
+      habitacion: true,
+    },
+  });
+}

@@ -126,6 +126,15 @@ export const hotelTools = [
   },
 },
       {
+        name: "enviar_ubicacion",
+        description:
+          "Envía la ubicación exacta del hotel como un mapa dentro de WhatsApp. Úsala cuando el cliente pregunte cómo llegar, dónde está el hotel, o pida la dirección/ubicación.",
+        parameters: {
+          type: "OBJECT",
+          properties: {},
+        },
+      },
+      {
         name: "consultar_reserva",
         description:
           "Consulta el estado de la reserva del cliente: si está confirmada, cuánto debe pagar, sus fechas, o su código. Úsala cuando el cliente pregunte por su reserva, su pago, o su código de reserva.",

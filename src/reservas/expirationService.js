@@ -46,3 +46,33 @@ export async function expirarReservasPendientes() {
 
   return reservasVencidas.length;
 }
+
+export async function procesarCheckoutsAutomaticos() {
+  const hoy = new Date();
+
+  const reservasParaCheckout = await prisma.reserva.findMany({
+    where: {
+      estado: {
+        in: ["CONFIRMADA", "CHECK_IN"],
+      },
+      fechaSalida: {
+        lte: hoy,
+      },
+    },
+  });
+
+  for (const reserva of reservasParaCheckout) {
+    await prisma.reserva.update({
+      where: {
+        id: reserva.id,
+      },
+      data: {
+        estado: "CHECK_OUT",
+      },
+    });
+
+    console.log(`🚪 Checkout automático: ${reserva.codigo}`);
+  }
+
+  return reservasParaCheckout.length;
+}

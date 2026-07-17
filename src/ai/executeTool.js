@@ -1,3 +1,5 @@
+import { hotelInfo } from "../config/hotelInfo.js";
+
 import { obtenerTarifaPorPersonas } from "../tarifas/service.js";
 import {
   consultarDisponibilidad,
@@ -169,6 +171,25 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         precioTotal: Number(reserva.precioTotal),
         moneda: "HNL",
         estado: reserva.estado,
+      };
+    }
+
+    case "enviar_ubicacion": {
+      if (!socket || !jid) {
+        throw new Error("No se pudo acceder al chat de WhatsApp");
+      }
+
+      await socket.sendMessage(jid, {
+        location: {
+          degreesLatitude: hotelInfo.ubicacion.latitud,
+          degreesLongitude: hotelInfo.ubicacion.longitud,
+          name: hotelInfo.nombre,
+          address: hotelInfo.direccion,
+        },
+      });
+
+      return {
+        enviada: true,
       };
     }
 

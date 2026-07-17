@@ -20,7 +20,7 @@ import {
   registrarComprobante,
 } from "../pagos/service.js";
 
-import { crearReservaWalkIn } from "../reservas/service.js";
+import { crearReservaWalkIn, liberarReservaPorCodigo } from "../reservas/service.js";
 
 const loggerDescarga = pino({ level: "silent" });
 
@@ -184,6 +184,7 @@ async function enviarMenuJefe(socket, jid) {
     "/C1234 bot",
     "/C1234 historial",
     "/ocupar <telefono> <personas> <noches> <nombre y apellido>",
+    "/RES-2026-123456 liberar",
   ].join("\n");
 
   await socket.sendMessage(jid, {
@@ -301,6 +302,26 @@ async function procesarComandoOcupar({
   }
 }
 
+async function procesarComandoLiberar({
+  socket,
+  jid,
+  codigoReserva,
+}) {
+  try {
+    const reserva = await liberarReservaPorCodigo(codigoReserva);
+
+    await socket.sendMessage(jid, {
+      text:
+        `🔓 Habitación ${reserva.habitacion.numero} liberada — ${reserva.codigo}\n` +
+        `Cliente: ${reserva.cliente.nombre}`,
+    });
+  } catch (error) {
+    await socket.sendMessage(jid, {
+      text: `⚠️ ${error.message}`,
+    });
+  }
+}
+
 async function procesarComandoJefe({
   socket,
   jid,
@@ -342,6 +363,20 @@ async function procesarComandoJefe({
       personas: Number(coincidenciaOcupar[2]),
       noches: Number(coincidenciaOcupar[3]),
       nombre: coincidenciaOcupar[4].trim(),
+    });
+
+    return;
+  }
+
+  const coincidenciaLiberar = comandoOriginal.match(
+    /^\/(res-\d{4}-\d+)\s+liberar$/i
+  );
+
+  if (coincidenciaLiberar) {
+    await procesarComandoLiberar({
+      socket,
+      jid,
+      codigoReserva: coincidenciaLiberar[1],
     });
 
     return;
