@@ -169,12 +169,15 @@ exports.Prisma.ReservaScalarFieldEnum = {
 
 exports.Prisma.PagoScalarFieldEnum = {
   id: 'id',
+  codigo: 'codigo',
   reservaId: 'reservaId',
   proveedor: 'proveedor',
   referenciaExterna: 'referenciaExterna',
   monto: 'monto',
   moneda: 'moneda',
   estado: 'estado',
+  comprobanteUrl: 'comprobanteUrl',
+  motivoRechazo: 'motivoRechazo',
   urlPago: 'urlPago',
   fechaPago: 'fechaPago',
   respuestaProveedor: 'respuestaProveedor',

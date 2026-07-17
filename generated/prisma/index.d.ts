@@ -6278,12 +6278,15 @@ export namespace Prisma {
 
   export type PagoMinAggregateOutputType = {
     id: string | null
+    codigo: string | null
     reservaId: string | null
     proveedor: string | null
     referenciaExterna: string | null
     monto: Decimal | null
     moneda: string | null
     estado: $Enums.EstadoPago | null
+    comprobanteUrl: string | null
+    motivoRechazo: string | null
     urlPago: string | null
     fechaPago: Date | null
     createdAt: Date | null
@@ -6292,12 +6295,15 @@ export namespace Prisma {
 
   export type PagoMaxAggregateOutputType = {
     id: string | null
+    codigo: string | null
     reservaId: string | null
     proveedor: string | null
     referenciaExterna: string | null
     monto: Decimal | null
     moneda: string | null
     estado: $Enums.EstadoPago | null
+    comprobanteUrl: string | null
+    motivoRechazo: string | null
     urlPago: string | null
     fechaPago: Date | null
     createdAt: Date | null
@@ -6306,12 +6312,15 @@ export namespace Prisma {
 
   export type PagoCountAggregateOutputType = {
     id: number
+    codigo: number
     reservaId: number
     proveedor: number
     referenciaExterna: number
     monto: number
     moneda: number
     estado: number
+    comprobanteUrl: number
+    motivoRechazo: number
     urlPago: number
     fechaPago: number
     respuestaProveedor: number
@@ -6331,12 +6340,15 @@ export namespace Prisma {
 
   export type PagoMinAggregateInputType = {
     id?: true
+    codigo?: true
     reservaId?: true
     proveedor?: true
     referenciaExterna?: true
     monto?: true
     moneda?: true
     estado?: true
+    comprobanteUrl?: true
+    motivoRechazo?: true
     urlPago?: true
     fechaPago?: true
     createdAt?: true
@@ -6345,12 +6357,15 @@ export namespace Prisma {
 
   export type PagoMaxAggregateInputType = {
     id?: true
+    codigo?: true
     reservaId?: true
     proveedor?: true
     referenciaExterna?: true
     monto?: true
     moneda?: true
     estado?: true
+    comprobanteUrl?: true
+    motivoRechazo?: true
     urlPago?: true
     fechaPago?: true
     createdAt?: true
@@ -6359,12 +6374,15 @@ export namespace Prisma {
 
   export type PagoCountAggregateInputType = {
     id?: true
+    codigo?: true
     reservaId?: true
     proveedor?: true
     referenciaExterna?: true
     monto?: true
     moneda?: true
     estado?: true
+    comprobanteUrl?: true
+    motivoRechazo?: true
     urlPago?: true
     fechaPago?: true
     respuestaProveedor?: true
@@ -6461,12 +6479,15 @@ export namespace Prisma {
 
   export type PagoGroupByOutputType = {
     id: string
+    codigo: string | null
     reservaId: string
     proveedor: string
     referenciaExterna: string | null
     monto: Decimal
     moneda: string
     estado: $Enums.EstadoPago
+    comprobanteUrl: string | null
+    motivoRechazo: string | null
     urlPago: string | null
     fechaPago: Date | null
     respuestaProveedor: JsonValue | null
@@ -6495,12 +6516,15 @@ export namespace Prisma {
 
   export type PagoSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    codigo?: boolean
     reservaId?: boolean
     proveedor?: boolean
     referenciaExterna?: boolean
     monto?: boolean
     moneda?: boolean
     estado?: boolean
+    comprobanteUrl?: boolean
+    motivoRechazo?: boolean
     urlPago?: boolean
     fechaPago?: boolean
     respuestaProveedor?: boolean
@@ -6511,12 +6535,15 @@ export namespace Prisma {
 
   export type PagoSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    codigo?: boolean
     reservaId?: boolean
     proveedor?: boolean
     referenciaExterna?: boolean
     monto?: boolean
     moneda?: boolean
     estado?: boolean
+    comprobanteUrl?: boolean
+    motivoRechazo?: boolean
     urlPago?: boolean
     fechaPago?: boolean
     respuestaProveedor?: boolean
@@ -6527,12 +6554,15 @@ export namespace Prisma {
 
   export type PagoSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    codigo?: boolean
     reservaId?: boolean
     proveedor?: boolean
     referenciaExterna?: boolean
     monto?: boolean
     moneda?: boolean
     estado?: boolean
+    comprobanteUrl?: boolean
+    motivoRechazo?: boolean
     urlPago?: boolean
     fechaPago?: boolean
     respuestaProveedor?: boolean
@@ -6543,12 +6573,15 @@ export namespace Prisma {
 
   export type PagoSelectScalar = {
     id?: boolean
+    codigo?: boolean
     reservaId?: boolean
     proveedor?: boolean
     referenciaExterna?: boolean
     monto?: boolean
     moneda?: boolean
     estado?: boolean
+    comprobanteUrl?: boolean
+    motivoRechazo?: boolean
     urlPago?: boolean
     fechaPago?: boolean
     respuestaProveedor?: boolean
@@ -6556,7 +6589,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type PagoOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "reservaId" | "proveedor" | "referenciaExterna" | "monto" | "moneda" | "estado" | "urlPago" | "fechaPago" | "respuestaProveedor" | "createdAt" | "updatedAt", ExtArgs["result"]["pago"]>
+  export type PagoOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "codigo" | "reservaId" | "proveedor" | "referenciaExterna" | "monto" | "moneda" | "estado" | "comprobanteUrl" | "motivoRechazo" | "urlPago" | "fechaPago" | "respuestaProveedor" | "createdAt" | "updatedAt", ExtArgs["result"]["pago"]>
   export type PagoInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     reserva?: boolean | ReservaDefaultArgs<ExtArgs>
   }
@@ -6574,12 +6607,15 @@ export namespace Prisma {
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
+      codigo: string | null
       reservaId: string
       proveedor: string
       referenciaExterna: string | null
       monto: Prisma.Decimal
       moneda: string
       estado: $Enums.EstadoPago
+      comprobanteUrl: string | null
+      motivoRechazo: string | null
       urlPago: string | null
       fechaPago: Date | null
       respuestaProveedor: Prisma.JsonValue | null
@@ -7010,12 +7046,15 @@ export namespace Prisma {
    */
   interface PagoFieldRefs {
     readonly id: FieldRef<"Pago", 'String'>
+    readonly codigo: FieldRef<"Pago", 'String'>
     readonly reservaId: FieldRef<"Pago", 'String'>
     readonly proveedor: FieldRef<"Pago", 'String'>
     readonly referenciaExterna: FieldRef<"Pago", 'String'>
     readonly monto: FieldRef<"Pago", 'Decimal'>
     readonly moneda: FieldRef<"Pago", 'String'>
     readonly estado: FieldRef<"Pago", 'EstadoPago'>
+    readonly comprobanteUrl: FieldRef<"Pago", 'String'>
+    readonly motivoRechazo: FieldRef<"Pago", 'String'>
     readonly urlPago: FieldRef<"Pago", 'String'>
     readonly fechaPago: FieldRef<"Pago", 'DateTime'>
     readonly respuestaProveedor: FieldRef<"Pago", 'Json'>
@@ -10882,12 +10921,15 @@ export namespace Prisma {
 
   export const PagoScalarFieldEnum: {
     id: 'id',
+    codigo: 'codigo',
     reservaId: 'reservaId',
     proveedor: 'proveedor',
     referenciaExterna: 'referenciaExterna',
     monto: 'monto',
     moneda: 'moneda',
     estado: 'estado',
+    comprobanteUrl: 'comprobanteUrl',
+    motivoRechazo: 'motivoRechazo',
     urlPago: 'urlPago',
     fechaPago: 'fechaPago',
     respuestaProveedor: 'respuestaProveedor',
@@ -11491,12 +11533,15 @@ export namespace Prisma {
     OR?: PagoWhereInput[]
     NOT?: PagoWhereInput | PagoWhereInput[]
     id?: StringFilter<"Pago"> | string
+    codigo?: StringNullableFilter<"Pago"> | string | null
     reservaId?: StringFilter<"Pago"> | string
     proveedor?: StringFilter<"Pago"> | string
     referenciaExterna?: StringNullableFilter<"Pago"> | string | null
     monto?: DecimalFilter<"Pago"> | Decimal | DecimalJsLike | number | string
     moneda?: StringFilter<"Pago"> | string
     estado?: EnumEstadoPagoFilter<"Pago"> | $Enums.EstadoPago
+    comprobanteUrl?: StringNullableFilter<"Pago"> | string | null
+    motivoRechazo?: StringNullableFilter<"Pago"> | string | null
     urlPago?: StringNullableFilter<"Pago"> | string | null
     fechaPago?: DateTimeNullableFilter<"Pago"> | Date | string | null
     respuestaProveedor?: JsonNullableFilter<"Pago">
@@ -11507,12 +11552,15 @@ export namespace Prisma {
 
   export type PagoOrderByWithRelationInput = {
     id?: SortOrder
+    codigo?: SortOrderInput | SortOrder
     reservaId?: SortOrder
     proveedor?: SortOrder
     referenciaExterna?: SortOrderInput | SortOrder
     monto?: SortOrder
     moneda?: SortOrder
     estado?: SortOrder
+    comprobanteUrl?: SortOrderInput | SortOrder
+    motivoRechazo?: SortOrderInput | SortOrder
     urlPago?: SortOrderInput | SortOrder
     fechaPago?: SortOrderInput | SortOrder
     respuestaProveedor?: SortOrderInput | SortOrder
@@ -11523,6 +11571,7 @@ export namespace Prisma {
 
   export type PagoWhereUniqueInput = Prisma.AtLeast<{
     id?: string
+    codigo?: string
     reservaId?: string
     referenciaExterna?: string
     AND?: PagoWhereInput | PagoWhereInput[]
@@ -11532,22 +11581,27 @@ export namespace Prisma {
     monto?: DecimalFilter<"Pago"> | Decimal | DecimalJsLike | number | string
     moneda?: StringFilter<"Pago"> | string
     estado?: EnumEstadoPagoFilter<"Pago"> | $Enums.EstadoPago
+    comprobanteUrl?: StringNullableFilter<"Pago"> | string | null
+    motivoRechazo?: StringNullableFilter<"Pago"> | string | null
     urlPago?: StringNullableFilter<"Pago"> | string | null
     fechaPago?: DateTimeNullableFilter<"Pago"> | Date | string | null
     respuestaProveedor?: JsonNullableFilter<"Pago">
     createdAt?: DateTimeFilter<"Pago"> | Date | string
     updatedAt?: DateTimeFilter<"Pago"> | Date | string
     reserva?: XOR<ReservaScalarRelationFilter, ReservaWhereInput>
-  }, "id" | "reservaId" | "referenciaExterna">
+  }, "id" | "codigo" | "reservaId" | "referenciaExterna">
 
   export type PagoOrderByWithAggregationInput = {
     id?: SortOrder
+    codigo?: SortOrderInput | SortOrder
     reservaId?: SortOrder
     proveedor?: SortOrder
     referenciaExterna?: SortOrderInput | SortOrder
     monto?: SortOrder
     moneda?: SortOrder
     estado?: SortOrder
+    comprobanteUrl?: SortOrderInput | SortOrder
+    motivoRechazo?: SortOrderInput | SortOrder
     urlPago?: SortOrderInput | SortOrder
     fechaPago?: SortOrderInput | SortOrder
     respuestaProveedor?: SortOrderInput | SortOrder
@@ -11565,12 +11619,15 @@ export namespace Prisma {
     OR?: PagoScalarWhereWithAggregatesInput[]
     NOT?: PagoScalarWhereWithAggregatesInput | PagoScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"Pago"> | string
+    codigo?: StringNullableWithAggregatesFilter<"Pago"> | string | null
     reservaId?: StringWithAggregatesFilter<"Pago"> | string
     proveedor?: StringWithAggregatesFilter<"Pago"> | string
     referenciaExterna?: StringNullableWithAggregatesFilter<"Pago"> | string | null
     monto?: DecimalWithAggregatesFilter<"Pago"> | Decimal | DecimalJsLike | number | string
     moneda?: StringWithAggregatesFilter<"Pago"> | string
     estado?: EnumEstadoPagoWithAggregatesFilter<"Pago"> | $Enums.EstadoPago
+    comprobanteUrl?: StringNullableWithAggregatesFilter<"Pago"> | string | null
+    motivoRechazo?: StringNullableWithAggregatesFilter<"Pago"> | string | null
     urlPago?: StringNullableWithAggregatesFilter<"Pago"> | string | null
     fechaPago?: DateTimeNullableWithAggregatesFilter<"Pago"> | Date | string | null
     respuestaProveedor?: JsonNullableWithAggregatesFilter<"Pago">
@@ -12150,11 +12207,14 @@ export namespace Prisma {
 
   export type PagoCreateInput = {
     id?: string
+    codigo?: string | null
     proveedor?: string
     referenciaExterna?: string | null
     monto: Decimal | DecimalJsLike | number | string
     moneda?: string
     estado?: $Enums.EstadoPago
+    comprobanteUrl?: string | null
+    motivoRechazo?: string | null
     urlPago?: string | null
     fechaPago?: Date | string | null
     respuestaProveedor?: NullableJsonNullValueInput | InputJsonValue
@@ -12165,12 +12225,15 @@ export namespace Prisma {
 
   export type PagoUncheckedCreateInput = {
     id?: string
+    codigo?: string | null
     reservaId: string
     proveedor?: string
     referenciaExterna?: string | null
     monto: Decimal | DecimalJsLike | number | string
     moneda?: string
     estado?: $Enums.EstadoPago
+    comprobanteUrl?: string | null
+    motivoRechazo?: string | null
     urlPago?: string | null
     fechaPago?: Date | string | null
     respuestaProveedor?: NullableJsonNullValueInput | InputJsonValue
@@ -12180,11 +12243,14 @@ export namespace Prisma {
 
   export type PagoUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: NullableStringFieldUpdateOperationsInput | string | null
     proveedor?: StringFieldUpdateOperationsInput | string
     referenciaExterna?: NullableStringFieldUpdateOperationsInput | string | null
     monto?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     moneda?: StringFieldUpdateOperationsInput | string
     estado?: EnumEstadoPagoFieldUpdateOperationsInput | $Enums.EstadoPago
+    comprobanteUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    motivoRechazo?: NullableStringFieldUpdateOperationsInput | string | null
     urlPago?: NullableStringFieldUpdateOperationsInput | string | null
     fechaPago?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     respuestaProveedor?: NullableJsonNullValueInput | InputJsonValue
@@ -12195,12 +12261,15 @@ export namespace Prisma {
 
   export type PagoUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: NullableStringFieldUpdateOperationsInput | string | null
     reservaId?: StringFieldUpdateOperationsInput | string
     proveedor?: StringFieldUpdateOperationsInput | string
     referenciaExterna?: NullableStringFieldUpdateOperationsInput | string | null
     monto?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     moneda?: StringFieldUpdateOperationsInput | string
     estado?: EnumEstadoPagoFieldUpdateOperationsInput | $Enums.EstadoPago
+    comprobanteUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    motivoRechazo?: NullableStringFieldUpdateOperationsInput | string | null
     urlPago?: NullableStringFieldUpdateOperationsInput | string | null
     fechaPago?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     respuestaProveedor?: NullableJsonNullValueInput | InputJsonValue
@@ -12210,12 +12279,15 @@ export namespace Prisma {
 
   export type PagoCreateManyInput = {
     id?: string
+    codigo?: string | null
     reservaId: string
     proveedor?: string
     referenciaExterna?: string | null
     monto: Decimal | DecimalJsLike | number | string
     moneda?: string
     estado?: $Enums.EstadoPago
+    comprobanteUrl?: string | null
+    motivoRechazo?: string | null
     urlPago?: string | null
     fechaPago?: Date | string | null
     respuestaProveedor?: NullableJsonNullValueInput | InputJsonValue
@@ -12225,11 +12297,14 @@ export namespace Prisma {
 
   export type PagoUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: NullableStringFieldUpdateOperationsInput | string | null
     proveedor?: StringFieldUpdateOperationsInput | string
     referenciaExterna?: NullableStringFieldUpdateOperationsInput | string | null
     monto?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     moneda?: StringFieldUpdateOperationsInput | string
     estado?: EnumEstadoPagoFieldUpdateOperationsInput | $Enums.EstadoPago
+    comprobanteUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    motivoRechazo?: NullableStringFieldUpdateOperationsInput | string | null
     urlPago?: NullableStringFieldUpdateOperationsInput | string | null
     fechaPago?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     respuestaProveedor?: NullableJsonNullValueInput | InputJsonValue
@@ -12239,12 +12314,15 @@ export namespace Prisma {
 
   export type PagoUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: NullableStringFieldUpdateOperationsInput | string | null
     reservaId?: StringFieldUpdateOperationsInput | string
     proveedor?: StringFieldUpdateOperationsInput | string
     referenciaExterna?: NullableStringFieldUpdateOperationsInput | string | null
     monto?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     moneda?: StringFieldUpdateOperationsInput | string
     estado?: EnumEstadoPagoFieldUpdateOperationsInput | $Enums.EstadoPago
+    comprobanteUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    motivoRechazo?: NullableStringFieldUpdateOperationsInput | string | null
     urlPago?: NullableStringFieldUpdateOperationsInput | string | null
     fechaPago?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     respuestaProveedor?: NullableJsonNullValueInput | InputJsonValue
@@ -12971,12 +13049,15 @@ export namespace Prisma {
 
   export type PagoCountOrderByAggregateInput = {
     id?: SortOrder
+    codigo?: SortOrder
     reservaId?: SortOrder
     proveedor?: SortOrder
     referenciaExterna?: SortOrder
     monto?: SortOrder
     moneda?: SortOrder
     estado?: SortOrder
+    comprobanteUrl?: SortOrder
+    motivoRechazo?: SortOrder
     urlPago?: SortOrder
     fechaPago?: SortOrder
     respuestaProveedor?: SortOrder
@@ -12990,12 +13071,15 @@ export namespace Prisma {
 
   export type PagoMaxOrderByAggregateInput = {
     id?: SortOrder
+    codigo?: SortOrder
     reservaId?: SortOrder
     proveedor?: SortOrder
     referenciaExterna?: SortOrder
     monto?: SortOrder
     moneda?: SortOrder
     estado?: SortOrder
+    comprobanteUrl?: SortOrder
+    motivoRechazo?: SortOrder
     urlPago?: SortOrder
     fechaPago?: SortOrder
     createdAt?: SortOrder
@@ -13004,12 +13088,15 @@ export namespace Prisma {
 
   export type PagoMinOrderByAggregateInput = {
     id?: SortOrder
+    codigo?: SortOrder
     reservaId?: SortOrder
     proveedor?: SortOrder
     referenciaExterna?: SortOrder
     monto?: SortOrder
     moneda?: SortOrder
     estado?: SortOrder
+    comprobanteUrl?: SortOrder
+    motivoRechazo?: SortOrder
     urlPago?: SortOrder
     fechaPago?: SortOrder
     createdAt?: SortOrder
@@ -14142,11 +14229,14 @@ export namespace Prisma {
 
   export type PagoCreateWithoutReservaInput = {
     id?: string
+    codigo?: string | null
     proveedor?: string
     referenciaExterna?: string | null
     monto: Decimal | DecimalJsLike | number | string
     moneda?: string
     estado?: $Enums.EstadoPago
+    comprobanteUrl?: string | null
+    motivoRechazo?: string | null
     urlPago?: string | null
     fechaPago?: Date | string | null
     respuestaProveedor?: NullableJsonNullValueInput | InputJsonValue
@@ -14156,11 +14246,14 @@ export namespace Prisma {
 
   export type PagoUncheckedCreateWithoutReservaInput = {
     id?: string
+    codigo?: string | null
     proveedor?: string
     referenciaExterna?: string | null
     monto: Decimal | DecimalJsLike | number | string
     moneda?: string
     estado?: $Enums.EstadoPago
+    comprobanteUrl?: string | null
+    motivoRechazo?: string | null
     urlPago?: string | null
     fechaPago?: Date | string | null
     respuestaProveedor?: NullableJsonNullValueInput | InputJsonValue
@@ -14248,11 +14341,14 @@ export namespace Prisma {
 
   export type PagoUpdateWithoutReservaInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: NullableStringFieldUpdateOperationsInput | string | null
     proveedor?: StringFieldUpdateOperationsInput | string
     referenciaExterna?: NullableStringFieldUpdateOperationsInput | string | null
     monto?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     moneda?: StringFieldUpdateOperationsInput | string
     estado?: EnumEstadoPagoFieldUpdateOperationsInput | $Enums.EstadoPago
+    comprobanteUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    motivoRechazo?: NullableStringFieldUpdateOperationsInput | string | null
     urlPago?: NullableStringFieldUpdateOperationsInput | string | null
     fechaPago?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     respuestaProveedor?: NullableJsonNullValueInput | InputJsonValue
@@ -14262,11 +14358,14 @@ export namespace Prisma {
 
   export type PagoUncheckedUpdateWithoutReservaInput = {
     id?: StringFieldUpdateOperationsInput | string
+    codigo?: NullableStringFieldUpdateOperationsInput | string | null
     proveedor?: StringFieldUpdateOperationsInput | string
     referenciaExterna?: NullableStringFieldUpdateOperationsInput | string | null
     monto?: DecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string
     moneda?: StringFieldUpdateOperationsInput | string
     estado?: EnumEstadoPagoFieldUpdateOperationsInput | $Enums.EstadoPago
+    comprobanteUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    motivoRechazo?: NullableStringFieldUpdateOperationsInput | string | null
     urlPago?: NullableStringFieldUpdateOperationsInput | string | null
     fechaPago?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     respuestaProveedor?: NullableJsonNullValueInput | InputJsonValue

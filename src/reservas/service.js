@@ -432,6 +432,34 @@ export async function crearReservasMultiples({
   });
 }
 
+export async function obtenerReservaMasRecientePorTelefono(
+  telefono
+) {
+  const telefonoLimpio = String(telefono ?? "")
+    .replace(/\D/g, "")
+    .trim();
+
+  if (!telefonoLimpio) {
+    throw new Error("El teléfono es obligatorio");
+  }
+
+  return prisma.reserva.findFirst({
+    where: {
+      cliente: {
+        telefono: telefonoLimpio,
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      cliente: true,
+      habitacion: true,
+      pago: true,
+    },
+  });
+}
+
 export async function obtenerReservaPorCodigo(
   codigo
 ) {

@@ -6,6 +6,8 @@ import {
 import {
   crearReservaTemporal,
   crearReservasMultiples,
+  obtenerReservaMasRecientePorTelefono,
+  obtenerReservaPorCodigo,
 } from "../reservas/service.js";
 import { obtenerImagenesHabitacion } from "../imagenes/service.js";
 
@@ -167,6 +169,42 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         precioTotal: Number(reserva.precioTotal),
         moneda: "HNL",
         estado: reserva.estado,
+      };
+    }
+
+    case "consultar_reserva": {
+      if (!telefono) {
+        throw new Error("No se encontró el teléfono del cliente");
+      }
+
+      const codigoReserva = String(argumentos?.codigo ?? "").trim();
+
+      const reserva = codigoReserva
+        ? await obtenerReservaPorCodigo(codigoReserva)
+        : await obtenerReservaMasRecientePorTelefono(telefono);
+
+      if (!reserva) {
+        return {
+          encontrada: false,
+          mensaje: "No encontré ninguna reserva asociada a este número.",
+        };
+      }
+
+      return {
+        encontrada: true,
+        codigo: reserva.codigo,
+        nombreCliente: reserva.cliente?.nombre ?? null,
+        fechaEntrada: formatearFecha(reserva.fechaEntrada),
+        fechaSalida: formatearFecha(reserva.fechaSalida),
+        personas: reserva.cantidadPersonas,
+        noches: reserva.cantidadNoches,
+        habitacion: reserva.habitacion?.numero ?? null,
+        precioTotal: Number(reserva.precioTotal),
+        moneda: "HNL",
+        estadoReserva: reserva.estado,
+        estadoPago: reserva.pago?.estado ?? "NO_GENERADO",
+        codigoPago: reserva.pago?.codigo ?? null,
+        motivoRechazoPago: reserva.pago?.motivoRechazo ?? null,
       };
     }
 

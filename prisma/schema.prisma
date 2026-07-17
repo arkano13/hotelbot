@@ -126,16 +126,20 @@ model Reserva {
 }
 
 model Pago {
-  id        String @id @default(uuid())
-  reservaId String @unique
+  id        String  @id @default(uuid())
+  codigo    String? @unique
+  reservaId String  @unique
 
-  proveedor         String  @default("CLINPAYS")
+  proveedor         String  @default("TRANSFERENCIA")
   referenciaExterna String? @unique
 
   monto  Decimal @db.Decimal(10, 2)
   moneda String  @default("HNL")
 
   estado EstadoPago @default(NO_GENERADO)
+
+  comprobanteUrl String?
+  motivoRechazo  String?
 
   urlPago String?
 

@@ -9,6 +9,144 @@ const ESTADOS_VALIDOS = [
   "REEMBOLSADO",
 ];
 
+async function generarCodigoPago() {
+  while (true) {
+    const codigo = `P${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const existente = await prisma.pago.findUnique({
+      where: {
+        codigo,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existente) {
+      return codigo;
+    }
+  }
+}
+
+export async function registrarComprobante({ reservaId, comprobanteUrl }) {
+  const reserva = await prisma.reserva.findUnique({
+    where: {
+      id: reservaId,
+    },
+    include: {
+      pago: true,
+      cliente: true,
+    },
+  });
+
+  if (!reserva) {
+    throw new Error("Reserva no encontrada");
+  }
+
+  if (reserva.estado === "CANCELADA" || reserva.estado === "EXPIRADA") {
+    throw new Error("La reserva ya no puede recibir comprobantes");
+  }
+
+  let pago = reserva.pago;
+
+  if (!pago) {
+    pago = await prisma.pago.create({
+      data: {
+        reservaId: reserva.id,
+        monto: reserva.precioTotal,
+        estado: "NO_GENERADO",
+      },
+    });
+  }
+
+  if (pago.estado === "APROBADO") {
+    throw new Error("Este pago ya fue aprobado anteriormente");
+  }
+
+  const codigo = pago.codigo ?? (await generarCodigoPago());
+
+  return prisma.pago.update({
+    where: {
+      id: pago.id,
+    },
+    data: {
+      codigo,
+      comprobanteUrl,
+      estado: "PENDIENTE",
+      motivoRechazo: null,
+    },
+    include: {
+      reserva: {
+        include: {
+          cliente: true,
+        },
+      },
+    },
+  });
+}
+
+export async function obtenerPagoPorCodigo(codigo) {
+  const codigoLimpio = String(codigo ?? "").trim().toUpperCase();
+
+  if (!codigoLimpio) {
+    throw new Error("El código de pago es obligatorio");
+  }
+
+  const pago = await prisma.pago.findUnique({
+    where: {
+      codigo: codigoLimpio,
+    },
+    include: {
+      reserva: {
+        include: {
+          cliente: true,
+        },
+      },
+    },
+  });
+
+  if (!pago) {
+    throw new Error("Pago no encontrado");
+  }
+
+  return pago;
+}
+
+export async function aprobarPagoPorCodigo(codigo) {
+  const pago = await obtenerPagoPorCodigo(codigo);
+
+  if (pago.estado === "APROBADO") {
+    throw new Error("Este pago ya fue aprobado anteriormente");
+  }
+
+  return actualizarEstadoPago(pago.id, "APROBADO");
+}
+
+export async function rechazarPagoPorCodigo(codigo, motivo) {
+  const pago = await obtenerPagoPorCodigo(codigo);
+
+  if (pago.estado === "APROBADO") {
+    throw new Error("Este pago ya fue aprobado, no se puede rechazar");
+  }
+
+  return prisma.pago.update({
+    where: {
+      id: pago.id,
+    },
+    data: {
+      estado: "RECHAZADO",
+      motivoRechazo: motivo?.trim() || "Sin motivo especificado",
+    },
+    include: {
+      reserva: {
+        include: {
+          cliente: true,
+        },
+      },
+    },
+  });
+}
+
 export async function crearPago(reservaId) {
   const reserva = await prisma.reserva.findUnique({
     where: {
@@ -112,7 +250,11 @@ export async function actualizarEstadoPago(id, estado) {
       id,
     },
     include: {
-      reserva: true,
+      reserva: {
+        include: {
+          cliente: true,
+        },
+      },
     },
   });
 
@@ -144,6 +286,9 @@ export async function actualizarEstadoPago(id, estado) {
         data: {
           estado: "CONFIRMADA",
           expiraEn: null,
+        },
+        include: {
+          cliente: true,
         },
       });
     }

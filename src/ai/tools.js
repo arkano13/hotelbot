@@ -125,6 +125,21 @@ export const hotelTools = [
     ],
   },
 },
+      {
+        name: "consultar_reserva",
+        description:
+          "Consulta el estado de la reserva del cliente: si está confirmada, cuánto debe pagar, sus fechas, o su código. Úsala cuando el cliente pregunte por su reserva, su pago, o su código de reserva.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            codigo: {
+              type: "STRING",
+              description:
+                "Código de reserva si el cliente lo proporciona (ej. R1234). Si no lo da, deja este campo vacío y se buscará por su número de teléfono.",
+            },
+          },
+        },
+      },
     ],
   },
 ];
