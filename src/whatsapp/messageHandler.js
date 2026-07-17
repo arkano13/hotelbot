@@ -20,6 +20,8 @@ import {
   registrarComprobante,
 } from "../pagos/service.js";
 
+import { crearReservaWalkIn } from "../reservas/service.js";
+
 const loggerDescarga = pino({ level: "silent" });
 
 function formatearRol(role) {
@@ -56,6 +58,34 @@ function formatearHistorial(conversacion) {
 
 const mensajesPendientes = new Map();
 const TIEMPO_ESPERA = 3000;
+
+const mensajesProcesados = new Map();
+const TIEMPO_RETENCION_IDS = 10 * 60 * 1000;
+
+function yaFueProcesado(messageId) {
+  if (!messageId) {
+    return false;
+  }
+
+  const ahora = Date.now();
+
+  for (const [id, expiracion] of mensajesProcesados) {
+    if (expiracion < ahora) {
+      mensajesProcesados.delete(id);
+    }
+  }
+
+  if (mensajesProcesados.has(messageId)) {
+    return true;
+  }
+
+  mensajesProcesados.set(
+    messageId,
+    ahora + TIEMPO_RETENCION_IDS
+  );
+
+  return false;
+}
 
 const OWNER_PHONE = String(
   process.env.OWNER_PHONE ?? ""
@@ -153,6 +183,7 @@ async function enviarMenuJefe(socket, jid) {
     "/C1234 humano",
     "/C1234 bot",
     "/C1234 historial",
+    "/ocupar <telefono> <personas> <noches> <nombre y apellido>",
   ].join("\n");
 
   await socket.sendMessage(jid, {
@@ -215,6 +246,61 @@ async function procesarComandoPago({
   }
 }
 
+async function procesarComandoOcupar({
+  socket,
+  jid,
+  telefonoCliente,
+  personas,
+  noches,
+  nombre,
+}) {
+  try {
+    if (!Number.isInteger(personas) || personas < 1) {
+      throw new Error("La cantidad de personas no es válida");
+    }
+
+    if (!Number.isInteger(noches) || noches < 1) {
+      throw new Error("La cantidad de noches no es válida");
+    }
+
+    const fechaEntrada = obtenerFechaActual();
+    const fechaSalida = sumarDias(fechaEntrada, noches);
+
+    const reserva = await crearReservaWalkIn({
+      nombre,
+      telefono: telefonoCliente,
+      fechaEntrada,
+      fechaSalida,
+      personas,
+    });
+
+    await socket.sendMessage(jid, {
+      text:
+        `✅ Reserva registrada — ${reserva.codigo}\n` +
+        `Cliente: ${nombre} (${formatearTelefono(telefonoCliente)})\n` +
+        `Fechas: ${formatearFechaCorta(fechaEntrada)} → ${formatearFechaCorta(
+          fechaSalida
+        )}\n` +
+        `Personas: ${personas} | Noches: ${noches}\n` +
+        `Total: L. ${Number(reserva.precioTotal).toFixed(2)} (efectivo, ya confirmado)`,
+    });
+
+    await socket.sendMessage(`${telefonoCliente}@s.whatsapp.net`, {
+      text:
+        `✅ ¡Bienvenido! Tu reserva quedó confirmada.\n` +
+        `Código: ${reserva.codigo}\n` +
+        `Fechas: ${formatearFechaCorta(fechaEntrada)} → ${formatearFechaCorta(
+          fechaSalida
+        )}\n` +
+        `Total: L. ${Number(reserva.precioTotal).toFixed(2)} (efectivo)`,
+    });
+  } catch (error) {
+    await socket.sendMessage(jid, {
+      text: `⚠️ ${error.message}`,
+    });
+  }
+}
+
 async function procesarComandoJefe({
   socket,
   jid,
@@ -239,6 +325,23 @@ async function procesarComandoJefe({
       codigoPago: coincidenciaPago[1].toUpperCase(),
       accion: coincidenciaPago[2].toLowerCase(),
       motivo: coincidenciaPago[3]?.trim(),
+    });
+
+    return;
+  }
+
+  const coincidenciaOcupar = comandoOriginal.match(
+    /^\/ocupar\s+(\d{8,})\s+(\d+)\s+(\d+)\s+(.+)$/i
+  );
+
+  if (coincidenciaOcupar) {
+    await procesarComandoOcupar({
+      socket,
+      jid,
+      telefonoCliente: coincidenciaOcupar[1].replace(/\D/g, ""),
+      personas: Number(coincidenciaOcupar[2]),
+      noches: Number(coincidenciaOcupar[3]),
+      nombre: coincidenciaOcupar[4].trim(),
     });
 
     return;
@@ -309,6 +412,21 @@ async function procesarComandoJefe({
   await socket.sendMessage(jid, {
     text: respuesta,
   });
+}
+
+function obtenerFechaActual() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Tegucigalpa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function sumarDias(fechaISO, dias) {
+  const fecha = new Date(`${fechaISO}T00:00:00`);
+  fecha.setDate(fecha.getDate() + dias);
+  return fecha.toISOString().slice(0, 10);
 }
 
 function formatearFechaCorta(fecha) {
@@ -527,6 +645,14 @@ export async function manejarMensajeEntrante({
     !message?.message ||
     message.key?.fromMe
   ) {
+    return;
+  }
+
+  if (yaFueProcesado(message.key?.id)) {
+    console.log(
+      `🔁 Mensaje duplicado ignorado: ${message.key?.id}`
+    );
+
     return;
   }
 

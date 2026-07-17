@@ -8,9 +8,22 @@ import disponibilidadRoutes from "./disponibilidad/routes.js";
 import reservasRoutes from "./reservas/routes.js";
 import pagosRoutes from "./pagos/routes.js";
 
+import { requireApiKey } from "./lib/auth.js";
+import { apiLimiter } from "./lib/rateLimit.js";
+
 const app = express();
 
-app.use(cors());
+const ORIGENES_PERMITIDOS = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origen) => origen.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: ORIGENES_PERMITIDOS.length ? ORIGENES_PERMITIDOS : false,
+  })
+);
+
 app.use(express.json());
 app.use(
   "/uploads",
@@ -31,6 +44,8 @@ app.get("/api/health", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+app.use("/api", apiLimiter, requireApiKey);
 
 app.use("/api/tarifas", tarifasRoutes);
 app.use("/api/clientes", clientesRoutes);

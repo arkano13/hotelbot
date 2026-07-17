@@ -8,6 +8,12 @@ import {
   iniciarSchedulerConversaciones,
   detenerSchedulerConversaciones,
 } from "./conversations/scheduler.js";
+
+import {
+  iniciarSchedulerReportes,
+  detenerSchedulerReportes,
+} from "./reportes/scheduler.js";
+
 const PORT = Number(process.env.PORT) || 3000;
 
 let servidor = null;
@@ -26,6 +32,7 @@ async function iniciarServidor() {
     });
 
     iniciarSchedulerConversaciones();
+    iniciarSchedulerReportes();
 
     await iniciarWhatsApp();
   } catch (error) {
@@ -35,6 +42,7 @@ async function iniciarServidor() {
     );
 
     detenerSchedulerConversaciones();
+    detenerSchedulerReportes();
 
     await prisma.$disconnect().catch(() => {});
 
@@ -54,6 +62,7 @@ async function cerrarServidor(signal) {
   );
 
   detenerSchedulerConversaciones();
+  detenerSchedulerReportes();
 
   if (servidor) {
     await new Promise((resolve) => {

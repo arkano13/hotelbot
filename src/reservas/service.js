@@ -269,6 +269,152 @@ export async function crearReservaTemporal({
   });
 }
 
+export async function crearReservaWalkIn({
+  nombre,
+  telefono,
+  fechaEntrada,
+  fechaSalida,
+  personas,
+}) {
+  const {
+    nombreLimpio,
+    telefonoLimpio,
+    cantidadPersonas,
+    entrada,
+    salida,
+  } = validarDatosReserva({
+    nombre,
+    telefono,
+    fechaEntrada,
+    fechaSalida,
+    personas,
+  });
+
+  if (cantidadPersonas > 3) {
+    throw new Error(
+      "Para más de 3 personas se necesitan varias habitaciones. Usa /ocupar una vez por cada habitación."
+    );
+  }
+
+  const disponibilidad =
+    await consultarDisponibilidad({
+      fechaEntrada,
+      fechaSalida,
+      personas: cantidadPersonas,
+    });
+
+  if (
+    !disponibilidad.disponible ||
+    !disponibilidad.habitacion
+  ) {
+    throw new Error(
+      "No hay habitaciones disponibles para esas fechas"
+    );
+  }
+
+  const tarifa =
+    await obtenerTarifaPorPersonas(
+      cantidadPersonas
+    );
+
+  const cantidadNoches = calcularNoches(
+    entrada,
+    salida
+  );
+
+  const precioPorNoche = Number(
+    tarifa.precio
+  );
+
+  const precioTotal =
+    precioPorNoche * cantidadNoches;
+
+  const cliente =
+    await crearOActualizarCliente({
+      nombre: nombreLimpio,
+      telefono: telefonoLimpio,
+    });
+
+  return prisma.$transaction(async (tx) => {
+    const conflicto = await tx.reserva.findFirst({
+      where: {
+        habitacionId:
+          disponibilidad.habitacion.id,
+
+        estado: {
+          in: [
+            "PENDIENTE_PAGO",
+            "CONFIRMADA",
+            "CHECK_IN",
+          ],
+        },
+
+        fechaEntrada: {
+          lt: salida,
+        },
+
+        fechaSalida: {
+          gt: entrada,
+        },
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+    if (conflicto) {
+      throw new Error(
+        "La habitación dejó de estar disponible. Intenta nuevamente"
+      );
+    }
+
+    const codigo = await generarCodigoUnico(tx);
+
+    const reserva = await tx.reserva.create({
+      data: {
+        codigo,
+        clienteId: cliente.id,
+
+        habitacionId:
+          disponibilidad.habitacion.id,
+
+        fechaEntrada: entrada,
+        fechaSalida: salida,
+
+        cantidadPersonas,
+        cantidadNoches,
+
+        precioPorNoche,
+        precioTotal,
+
+        estado: "CONFIRMADA",
+        expiraEn: null,
+
+        observaciones: "Walk-in, pago en efectivo",
+      },
+    });
+
+    const pago = await tx.pago.create({
+      data: {
+        reservaId: reserva.id,
+        monto: precioTotal,
+        proveedor: "EFECTIVO",
+        estado: "APROBADO",
+        fechaPago: new Date(),
+      },
+    });
+
+    return {
+      ...reserva,
+      cliente,
+      habitacion:
+        disponibilidad.habitacion,
+      pago,
+    };
+  });
+}
+
 export async function crearReservasMultiples({
   nombre,
   telefono,
