@@ -20,7 +20,15 @@ import {
   registrarComprobante,
 } from "../pagos/service.js";
 
-import { crearReservaWalkIn, liberarReservaPorCodigo } from "../reservas/service.js";
+import {
+  crearReservaWalkIn,
+  liberarReservaPorCodigo,
+  listarHabitacionesDisponiblesWalkIn,
+  listarReservasParaCheckIn,
+  listarReservasParaCheckout,
+  registrarCheckInPorHabitacion,
+  registrarCheckoutPorHabitacion,
+} from "../reservas/service.js";
 
 const loggerDescarga = pino({ level: "silent" });
 
@@ -61,6 +69,8 @@ const TIEMPO_ESPERA = 3000;
 
 const mensajesProcesados = new Map();
 const TIEMPO_RETENCION_IDS = 10 * 60 * 1000;
+
+const flujosJefe = new Map();
 
 function yaFueProcesado(messageId) {
   if (!messageId) {
@@ -119,6 +129,8 @@ function obtenerTextoMensaje(message) {
     message.message?.extendedTextMessage?.text ||
     message.message?.imageMessage?.caption ||
     message.message?.videoMessage?.caption ||
+    message.message?.buttonsResponseMessage?.selectedButtonId ||
+    message.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
     ""
   ).trim();
 }
@@ -139,57 +151,158 @@ function formatearTelefono(telefono) {
 }
 
 async function enviarMenuJefe(socket, jid) {
-  const conversaciones =
-    await listarConversacionesActivas();
+  await socket.sendMessage(jid, {
+    text: "🏨 MENÚ DEL JEFE\n\n" +
+      "1️⃣ Ocupar habitación\n" +
+      "2️⃣ Check-in\n" +
+      "3️⃣ Checkout\n" +
+      "4️⃣ Cambiar modo BOT/HUMANO\n\n" +
+      "Responde con un número.",
+    sections: [
+      {
+        title: "Operaciones",
+        rows: [
+          { title: "Ocupar habitación", rowId: "jefe:menu:1", description: "Walk-in y efectivo" },
+          { title: "Check-in", rowId: "jefe:menu:2", description: "Elegir reserva confirmada" },
+          { title: "Checkout", rowId: "jefe:menu:3", description: "Elegir habitación ocupada" },
+          { title: "Cambiar modo BOT/HUMANO", rowId: "jefe:menu:4", description: "Ver conversaciones activas" },
+        ],
+      },
+    ],
+    listType: 1,
+    buttonText: "Abrir menú",
+  });
+}
 
-  const conversacionesClientes =
-    conversaciones.filter(
-      (conversacion) =>
-        conversacion.telefono !== OWNER_PHONE
-    );
+async function enviarConversacionesActivas(socket, jid) {
+  const conversaciones = await listarConversacionesActivas();
+  const conversacionesClientes = conversaciones.filter(
+    (conversacion) => conversacion.telefono !== OWNER_PHONE
+  );
 
-  if (conversacionesClientes.length === 0) {
-    await socket.sendMessage(jid, {
-      text: "No hay conversaciones activas.",
-    });
-
+  if (!conversacionesClientes.length) {
+    await socket.sendMessage(jid, { text: "No hay conversaciones activas." });
     return;
   }
 
-  const filas = conversacionesClientes.map(
-    (conversacion) => {
-      const codigo =
-        conversacion.codigo || "SIN-CODIGO";
-
-      const telefono = formatearTelefono(
-        conversacion.telefono
-      );
-
-      const modo =
-        conversacion.mode === "HUMANO"
-          ? "👤 HUMANO"
-          : "🤖 BOT";
-
-      return `${codigo} | ${telefono} | ${modo}`;
-    }
-  );
-
-  const texto = [
-    "💬 Conversaciones activas",
-    "",
-    ...filas,
-    "",
-    "Comandos:",
-    "/C1234 humano",
-    "/C1234 bot",
-    "/C1234 historial",
-    "/ocupar <telefono> <personas> <noches> <nombre y apellido>",
-    "/RES-2026-123456 liberar",
-  ].join("\n");
+  const filas = conversacionesClientes.map((conversacion) => {
+    const codigo = conversacion.codigo || "SIN-CODIGO";
+    const telefono = formatearTelefono(conversacion.telefono);
+    const modo = conversacion.mode === "HUMANO" ? "👤 HUMANO" : "🤖 BOT";
+    return `${codigo} | ${telefono} | ${modo}`;
+  });
 
   await socket.sendMessage(jid, {
-    text: texto,
+    text: "💬 Conversaciones activas\n\n" +
+      filas.join("\n") +
+      "\n\nUsa:\n/C1234 humano\n/C1234 bot\n/C1234 historial",
   });
+}
+
+async function enviarSeleccionHabitaciones(socket, jid, habitaciones, accion) {
+  if (!habitaciones.length) {
+    await socket.sendMessage(jid, { text: "No hay habitaciones disponibles para esta operación." });
+    return;
+  }
+
+  await socket.sendMessage(jid, {
+    text: "Selecciona una habitación:",
+    sections: [{
+      title: "Habitaciones",
+      rows: habitaciones.map((habitacion) => ({
+        title: `Habitación ${habitacion.numero}`,
+        rowId: `jefe:room:${accion}:${habitacion.id}`,
+        description: `Capacidad: ${habitacion.capacidad}`,
+      })),
+    }],
+    listType: 1,
+    buttonText: "Elegir habitación",
+  });
+}
+
+async function procesarFlujoJefe({ socket, jid, texto }) {
+  const textoNormalizado = texto.toLowerCase();
+  if (textoNormalizado === "/menu" || textoNormalizado.startsWith("jefe:menu:")) return false;
+
+  const flujo = flujosJefe.get(jid);
+  if (!flujo) return false;
+
+  if (flujo.tipo === "OCUPAR_DATOS") {
+    const partes = texto.split("|").map((parte) => parte.trim());
+    if (partes.length < 3) {
+      await socket.sendMessage(jid, { text: "Formato: Nombre | personas | noches\nEjemplo: Juan Pérez | 1 | 2" });
+      return true;
+    }
+
+    const [nombre, personasTexto, nochesTexto] = partes;
+    const personas = Number(personasTexto);
+    const noches = Number(nochesTexto);
+    if (!nombre || !Number.isInteger(personas) || personas < 1 ||
+        !Number.isInteger(noches) || noches < 1) {
+      await socket.sendMessage(jid, { text: "Datos inválidos. Ejemplo: Juan Pérez | 1 | 2" });
+      return true;
+    }
+
+    const fechaEntrada = obtenerFechaActual();
+    const fechaSalida = sumarDias(fechaEntrada, noches);
+    try {
+      const reserva = await crearReservaWalkIn({
+        nombre,
+        telefono: null,
+        personas,
+        fechaEntrada,
+        fechaSalida,
+      });
+      await socket.sendMessage(jid, {
+        text: `✅ Habitación ${reserva.habitacion.numero} ocupada automáticamente.\nReserva: ${reserva.codigo}\nCliente: ${reserva.cliente.nombre}\nPago: efectivo confirmado.`,
+      });
+    } catch (error) {
+      await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
+    }
+    flujosJefe.delete(jid);
+    return true;
+  }
+
+  if (flujo.tipo === "OCUPAR_HABITACION" && texto.startsWith("jefe:room:ocupar:")) {
+    try {
+      const reserva = await crearReservaWalkIn({
+        ...flujo.datos,
+        habitacionId: texto.split(":").pop(),
+        noches: undefined,
+      });
+      await socket.sendMessage(jid, {
+        text: `✅ Habitación ${reserva.habitacion.numero} ocupada.\nReserva: ${reserva.codigo}\nCliente: ${reserva.cliente.nombre}\nPago: efectivo confirmado.`,
+      });
+    } catch (error) {
+      await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
+    }
+    flujosJefe.delete(jid);
+    return true;
+  }
+
+  if (flujo.tipo === "CHECKIN" && texto.startsWith("jefe:room:checkin:")) {
+    try {
+      const reserva = await registrarCheckInPorHabitacion(texto.split(":").pop());
+      await socket.sendMessage(jid, { text: `✅ Check-in realizado en habitación ${reserva.habitacion.numero}. Reserva ${reserva.codigo}.` });
+    } catch (error) {
+      await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
+    }
+    flujosJefe.delete(jid);
+    return true;
+  }
+
+  if (flujo.tipo === "CHECKOUT" && texto.startsWith("jefe:room:checkout:")) {
+    try {
+      const reserva = await registrarCheckoutPorHabitacion(texto.split(":").pop());
+      await socket.sendMessage(jid, { text: `✅ Checkout realizado en habitación ${reserva.habitacion.numero}. Reserva ${reserva.codigo}.` });
+    } catch (error) {
+      await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
+    }
+    flujosJefe.delete(jid);
+    return true;
+  }
+
+  return false;
 }
 
 async function procesarComandoPago({
@@ -322,130 +435,102 @@ async function procesarComandoLiberar({
   }
 }
 
-async function procesarComandoJefe({
-  socket,
-  jid,
-  texto,
-}) {
+async function procesarComandoJefe({ socket, jid, texto }) {
   const comandoOriginal = texto.trim();
   const comando = comandoOriginal.toLowerCase();
 
   if (comando === "/menu") {
+    flujosJefe.delete(jid);
     await enviarMenuJefe(socket, jid);
     return;
   }
 
-  const coincidenciaPago = comandoOriginal.match(
-    /^\/(p\d+)\s+(aprobar|rechazar)(?:\s+(.+))?$/i
-  );
+  if (["jefe:menu:1", "1"].includes(comando)) {
+    flujosJefe.set(jid, { tipo: "OCUPAR_DATOS" });
+    await socket.sendMessage(jid, {
+      text: "🏨 Ocupar habitación\n\nEscribe:\nNombre | personas | noches\nEjemplo: Juan Pérez | 1 | 2",
+    });
+    return;
+  }
 
+  if (["jefe:menu:2", "2"].includes(comando)) {
+    const reservas = await listarReservasParaCheckIn();
+    flujosJefe.set(jid, { tipo: "CHECKIN" });
+    await enviarSeleccionHabitaciones(socket, jid, reservas.map((reserva) => reserva.habitacion), "checkin");
+    return;
+  }
+
+  if (["jefe:menu:3", "3"].includes(comando)) {
+    const reservas = await listarReservasParaCheckout();
+    flujosJefe.set(jid, { tipo: "CHECKOUT" });
+    await enviarSeleccionHabitaciones(socket, jid, reservas.map((reserva) => reserva.habitacion), "checkout");
+    return;
+  }
+
+  if (["jefe:menu:4", "4"].includes(comando)) {
+    await enviarConversacionesActivas(socket, jid);
+    return;
+  }
+
+  if (await procesarFlujoJefe({ socket, jid, texto: comandoOriginal })) return;
+
+  const coincidenciaPago = comandoOriginal.match(/^\/(p\d+)\s+(aprobar|rechazar)(?:\s+(.+))?$/i);
   if (coincidenciaPago) {
     await procesarComandoPago({
-      socket,
-      jid,
+      socket, jid,
       codigoPago: coincidenciaPago[1].toUpperCase(),
       accion: coincidenciaPago[2].toLowerCase(),
       motivo: coincidenciaPago[3]?.trim(),
     });
-
     return;
   }
 
-  const coincidenciaOcupar = comandoOriginal.match(
-    /^\/ocupar\s+(\d{8,})\s+(\d+)\s+(\d+)\s+(.+)$/i
-  );
-
+  const coincidenciaOcupar = comandoOriginal.match(/^\/ocupar\s+(\d{8,})\s+(\d+)\s+(\d+)\s+(.+)$/i);
   if (coincidenciaOcupar) {
     await procesarComandoOcupar({
-      socket,
-      jid,
+      socket, jid,
       telefonoCliente: coincidenciaOcupar[1].replace(/\D/g, ""),
       personas: Number(coincidenciaOcupar[2]),
       noches: Number(coincidenciaOcupar[3]),
       nombre: coincidenciaOcupar[4].trim(),
     });
-
     return;
   }
 
-  const coincidenciaLiberar = comandoOriginal.match(
-    /^\/(res-\d{4}-\d+)\s+liberar$/i
-  );
-
+  const coincidenciaLiberar = comandoOriginal.match(/^\/(res-\d{4}-\d+)\s+liberar$/i);
   if (coincidenciaLiberar) {
-    await procesarComandoLiberar({
-      socket,
-      jid,
-      codigoReserva: coincidenciaLiberar[1],
-    });
-
+    await procesarComandoLiberar({ socket, jid, codigoReserva: coincidenciaLiberar[1] });
     return;
   }
 
-  const coincidencia = comando.match(
-    /^\/(c\d+)\s+(humano|bot|historial)$/i
-  );
-
+  const coincidencia = comando.match(/^\/(c\d+)\s+(humano|bot|historial)$/i);
   if (!coincidencia) {
-    await socket.sendMessage(jid, {
-      text: "Escribe /menu para ver las conversaciones.",
-    });
-
+    await socket.sendMessage(jid, { text: "Escribe /menu para abrir el menú del jefe." });
     return;
   }
 
-  const codigo =
-    coincidencia[1].toUpperCase();
-
+  const codigo = coincidencia[1].toUpperCase();
   const accion = coincidencia[2].toLowerCase();
-
   let conversacion;
-
   try {
-    conversacion =
-      await obtenerConversacionPorCodigo(
-        codigo
-      );
+    conversacion = await obtenerConversacionPorCodigo(codigo);
   } catch {
-    await socket.sendMessage(jid, {
-      text: `No encontré la conversación ${codigo}. Escribe /menu.`,
-    });
-
+    await socket.sendMessage(jid, { text: `No encontré la conversación ${codigo}. Escribe /menu.` });
     return;
   }
 
   if (accion === "historial") {
-    const conversacionConHistorial =
-      await obtenerConversacionConHistorial(
-        conversacion.telefono,
-        100
-      );
-
-    await socket.sendMessage(jid, {
-      text: formatearHistorial(conversacionConHistorial),
-    });
-
+    const historial = await obtenerConversacionConHistorial(conversacion.telefono, 100);
+    await socket.sendMessage(jid, { text: formatearHistorial(historial) });
     return;
   }
 
   const modo = accion === "humano" ? "HUMANO" : "BOT";
-
-  await cambiarModoConversacion(
-    conversacion.id,
-    modo
-  );
-
-  const telefono = formatearTelefono(
-    conversacion.telefono
-  );
-
-  const respuesta =
-    modo === "HUMANO"
-      ? `✅ ${codigo} (${telefono}) ahora está en modo HUMANO. Puedes responder desde el WhatsApp del hotel.`
-      : `✅ ${codigo} (${telefono}) volvió al modo BOT.`;
-
+  await cambiarModoConversacion(conversacion.id, modo);
   await socket.sendMessage(jid, {
-    text: respuesta,
+    text: modo === "HUMANO"
+      ? `✅ ${codigo} ahora está en modo HUMANO.`
+      : `✅ ${codigo} volvió al modo BOT.`,
   });
 }
 

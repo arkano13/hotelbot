@@ -69,7 +69,7 @@ model Habitacion {
 model Cliente {
   id        String   @id @default(uuid())
   nombre    String
-  telefono  String   @unique
+  telefono  String?  @unique
   correo    String?
   documento String?
   createdAt DateTime @default(now())

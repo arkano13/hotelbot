@@ -1,114 +1,203 @@
 import { obtenerWhatsAppSocket } from "../whatsapp/client.js";
-import { obtenerResumenDiario, obtenerResumenMensual } from "./service.js";
-import { generarPdfDiario, generarPdfMensual } from "./pdf.js";
 
-const INTERVALO_REVISION_MS = 1 * 60 * 1000;
+import {
+  obtenerResumenDiario,
+  obtenerResumenMensual,
+} from "./service.js";
+
+import {
+  generarPdfDiario,
+  generarPdfMensual,
+} from "./pdf.js";
+
+const INTERVALO_REVISION_MS = 60 * 1000;
 const HORA_ENVIO = 20;
 
-const OWNER_PHONE = String(process.env.OWNER_PHONE ?? "")
+const OWNER_PHONE = String(
+  process.env.OWNER_PHONE ?? ""
+)
   .replace(/\D/g, "")
   .trim();
 
 let intervalo = null;
+let ejecutando = false;
+
 let ultimoDiaEnviado = null;
 let ultimoMesEnviado = null;
 
 function obtenerFechaHoraHonduras() {
-  const formateador = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Tegucigalpa",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: false,
-  });
+  const formateador = new Intl.DateTimeFormat(
+    "en-CA",
+    {
+      timeZone: "America/Tegucigalpa",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      hour12: false,
+    }
+  );
 
   const partes = Object.fromEntries(
-    formateador.formatToParts(new Date()).map((p) => [p.type, p.value])
+    formateador
+      .formatToParts(new Date())
+      .map((parte) => [
+        parte.type,
+        parte.value,
+      ])
   );
 
   return {
-    fechaISO: `${partes.year}-${partes.month}-${partes.day}`,
-    hora: Number(partes.hour),
+    fechaISO:
+      `${partes.year}-${partes.month}-${partes.day}`,
     anio: Number(partes.year),
     mes: Number(partes.month),
+    dia: Number(partes.day),
+    hora: Number(partes.hour),
   };
 }
 
-function diaAnterior(fechaISO) {
-  const fecha = new Date(`${fechaISO}T00:00:00Z`);
-  fecha.setUTCDate(fecha.getUTCDate() - 1);
-  return { anio: fecha.getUTCFullYear(), mes: fecha.getUTCMonth() + 1 };
+function obtenerMesAnterior(anio, mes) {
+  if (mes === 1) {
+    return {
+      anio: anio - 1,
+      mes: 12,
+    };
+  }
+
+  return {
+    anio,
+    mes: mes - 1,
+  };
 }
 
-async function enviarReporteDiario(socket, fechaISO) {
-  try {
-    const resumen = await obtenerResumenDiario(fechaISO);
-    const buffer = await generarPdfDiario(resumen);
+async function enviarReporteDiario(
+  socket,
+  fechaISO
+) {
+  const resumen =
+    await obtenerResumenDiario(fechaISO);
 
-    await socket.sendMessage(`${OWNER_PHONE}@s.whatsapp.net`, {
+  const buffer =
+    await generarPdfDiario(resumen);
+
+  await socket.sendMessage(
+    `${OWNER_PHONE}@s.whatsapp.net`,
+    {
       document: buffer,
       mimetype: "application/pdf",
-      fileName: `resumen-diario-${fechaISO}.pdf`,
-      caption: `📋 Resumen diario — ${fechaISO}`,
-    });
+      fileName:
+        `resumen-diario-${fechaISO}.pdf`,
+      caption:
+        `📋 Resumen diario — ${fechaISO}`,
+    }
+  );
 
-    console.log(`✅ Resumen diario enviado (${fechaISO})`);
-  } catch (error) {
-    console.error("❌ Error enviando resumen diario:", error);
-  }
+  console.log(
+    `✅ Resumen diario enviado (${fechaISO})`
+  );
 }
 
-async function enviarReporteMensual(socket, anio, mes) {
-  try {
-    const resumen = await obtenerResumenMensual(anio, mes);
-    const buffer = await generarPdfMensual(resumen);
+async function enviarReporteMensual(
+  socket,
+  anio,
+  mes
+) {
+  const resumen =
+    await obtenerResumenMensual(anio, mes);
 
-    await socket.sendMessage(`${OWNER_PHONE}@s.whatsapp.net`, {
+  const buffer =
+    await generarPdfMensual(resumen);
+
+  const mesFormateado = String(mes).padStart(
+    2,
+    "0"
+  );
+
+  await socket.sendMessage(
+    `${OWNER_PHONE}@s.whatsapp.net`,
+    {
       document: buffer,
       mimetype: "application/pdf",
-      fileName: `resumen-mensual-${anio}-${String(mes).padStart(2, "0")}.pdf`,
-      caption: `📊 Resumen mensual — ${mes}/${anio}`,
-    });
+      fileName:
+        `resumen-mensual-${anio}-${mesFormateado}.pdf`,
+      caption:
+        `📊 Resumen mensual — ${mesFormateado}/${anio}`,
+    }
+  );
 
-    console.log(`✅ Resumen mensual enviado (${mes}/${anio})`);
-  } catch (error) {
-    console.error("❌ Error enviando resumen mensual:", error);
-  }
+  console.log(
+    `✅ Resumen mensual enviado (${mesFormateado}/${anio})`
+  );
 }
 
 async function revisarYEnviar() {
-  if (!OWNER_PHONE) {
+  if (ejecutando || !OWNER_PHONE) {
     return;
   }
 
-  const { fechaISO, hora, anio, mes } = obtenerFechaHoraHonduras();
-
-  if (hora !== HORA_ENVIO) {
-    return;
-  }
-
-  let socket;
+  ejecutando = true;
 
   try {
-    socket = obtenerWhatsAppSocket();
-  } catch {
-    return;
-  }
+    const {
+      fechaISO,
+      anio,
+      mes,
+      dia,
+      hora,
+    } = obtenerFechaHoraHonduras();
 
-  if (ultimoDiaEnviado !== fechaISO) {
-    ultimoDiaEnviado = fechaISO;
-    await enviarReporteDiario(socket, fechaISO);
-  }
+    if (hora !== HORA_ENVIO) {
+      return;
+    }
 
-  const diaDelMes = Number(fechaISO.slice(8, 10));
-  const claveMes = `${anio}-${mes}`;
+    let socket;
 
-  if (diaDelMes === 1 && ultimoMesEnviado !== claveMes) {
-    ultimoMesEnviado = claveMes;
+    try {
+      socket = obtenerWhatsAppSocket();
+    } catch {
+      console.log(
+        "⚠️ Reportes pendientes: WhatsApp no está conectado"
+      );
 
-    const { anio: anioAnterior, mes: mesAnterior } = diaAnterior(fechaISO);
-    await enviarReporteMensual(socket, anioAnterior, mesAnterior);
+      return;
+    }
+
+    if (ultimoDiaEnviado !== fechaISO) {
+      await enviarReporteDiario(
+        socket,
+        fechaISO
+      );
+
+      ultimoDiaEnviado = fechaISO;
+    }
+
+    if (dia === 1) {
+      const mesAnterior =
+        obtenerMesAnterior(anio, mes);
+
+      const claveMes =
+        `${mesAnterior.anio}-${String(
+          mesAnterior.mes
+        ).padStart(2, "0")}`;
+
+      if (ultimoMesEnviado !== claveMes) {
+        await enviarReporteMensual(
+          socket,
+          mesAnterior.anio,
+          mesAnterior.mes
+        );
+
+        ultimoMesEnviado = claveMes;
+      }
+    }
+  } catch (error) {
+    console.error(
+      "❌ Error procesando reportes automáticos:",
+      error
+    );
+  } finally {
+    ejecutando = false;
   }
 }
 
@@ -117,7 +206,11 @@ export function iniciarSchedulerReportes() {
     return;
   }
 
-  console.log("✅ Scheduler de reportes iniciado: revisión cada 5 minutos");
+  console.log(
+    "✅ Scheduler de reportes iniciado: revisión cada 1 minuto"
+  );
+
+  revisarYEnviar().catch(console.error);
 
   intervalo = setInterval(() => {
     revisarYEnviar().catch(console.error);
@@ -132,5 +225,7 @@ export function detenerSchedulerReportes() {
   clearInterval(intervalo);
   intervalo = null;
 
-  console.log("🛑 Scheduler de reportes detenido");
+  console.log(
+    "🛑 Scheduler de reportes detenido"
+  );
 }

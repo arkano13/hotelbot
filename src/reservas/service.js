@@ -60,6 +60,7 @@ function validarDatosReserva({
   fechaEntrada,
   fechaSalida,
   personas,
+  telefonoObligatorio = true,
 }) {
   const nombreLimpio = String(nombre ?? "").trim();
   const telefonoLimpio = String(telefono ?? "").trim();
@@ -71,7 +72,7 @@ function validarDatosReserva({
     );
   }
 
-  if (!telefonoLimpio) {
+  if (telefonoObligatorio && !telefonoLimpio) {
     throw new Error(
       "El teléfono es obligatorio"
     );
@@ -275,126 +276,69 @@ export async function crearReservaWalkIn({
   fechaEntrada,
   fechaSalida,
   personas,
+  habitacionId,
 }) {
-  const {
-    nombreLimpio,
-    telefonoLimpio,
-    cantidadPersonas,
-    entrada,
-    salida,
-  } = validarDatosReserva({
+  const datos = validarDatosReserva({
     nombre,
     telefono,
     fechaEntrada,
     fechaSalida,
     personas,
+    telefonoObligatorio: false,
   });
 
+  const { nombreLimpio, telefonoLimpio, cantidadPersonas, entrada, salida } = datos;
   if (cantidadPersonas > 3) {
-    throw new Error(
-      "Para más de 3 personas se necesitan varias habitaciones. Usa /ocupar una vez por cada habitación."
-    );
+    throw new Error("Para más de 3 personas se necesitan varias habitaciones.");
   }
 
-  const disponibilidad =
-    await consultarDisponibilidad({
-      fechaEntrada,
-      fechaSalida,
-      personas: cantidadPersonas,
-    });
+  const habitacion = await prisma.habitacion.findFirst({
+    where: habitacionId
+      ? { id: habitacionId, activa: true, estado: "DISPONIBLE" }
+      : { activa: true, estado: "DISPONIBLE", capacidad: { gte: cantidadPersonas } },
+  });
 
-  if (
-    !disponibilidad.disponible ||
-    !disponibilidad.habitacion
-  ) {
-    throw new Error(
-      "No hay habitaciones disponibles para esas fechas"
-    );
+  if (!habitacion || habitacion.capacidad < cantidadPersonas) {
+    throw new Error("La habitación seleccionada no está disponible.");
   }
 
-  const tarifa =
-    await obtenerTarifaPorPersonas(
-      cantidadPersonas
-    );
+  const conflicto = await prisma.reserva.findFirst({
+    where: {
+      habitacionId: habitacion.id,
+      estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+      fechaEntrada: { lt: salida },
+      fechaSalida: { gt: entrada },
+    },
+  });
+  if (conflicto) throw new Error("La habitación dejó de estar disponible.");
 
-  const cantidadNoches = calcularNoches(
-    entrada,
-    salida
-  );
+  const tarifa = await obtenerTarifaPorPersonas(cantidadPersonas);
+  const cantidadNoches = calcularNoches(entrada, salida);
+  const precioPorNoche = Number(tarifa.precio);
+  const precioTotal = precioPorNoche * cantidadNoches;
 
-  const precioPorNoche = Number(
-    tarifa.precio
-  );
-
-  const precioTotal =
-    precioPorNoche * cantidadNoches;
-
-  const cliente =
-    await crearOActualizarCliente({
-      nombre: nombreLimpio,
-      telefono: telefonoLimpio,
-    });
+  const cliente = telefonoLimpio
+    ? await crearOActualizarCliente({ nombre: nombreLimpio, telefono: telefonoLimpio })
+    : await prisma.cliente.create({ data: { nombre: nombreLimpio, telefono: null } });
 
   return prisma.$transaction(async (tx) => {
-    const conflicto = await tx.reserva.findFirst({
-      where: {
-        habitacionId:
-          disponibilidad.habitacion.id,
-
-        estado: {
-          in: [
-            "PENDIENTE_PAGO",
-            "CONFIRMADA",
-            "CHECK_IN",
-          ],
-        },
-
-        fechaEntrada: {
-          lt: salida,
-        },
-
-        fechaSalida: {
-          gt: entrada,
-        },
-      },
-
-      select: {
-        id: true,
-      },
-    });
-
-    if (conflicto) {
-      throw new Error(
-        "La habitación dejó de estar disponible. Intenta nuevamente"
-      );
-    }
-
     const codigo = await generarCodigoUnico(tx);
-
     const reserva = await tx.reserva.create({
       data: {
         codigo,
         clienteId: cliente.id,
-
-        habitacionId:
-          disponibilidad.habitacion.id,
-
+        habitacionId: habitacion.id,
         fechaEntrada: entrada,
         fechaSalida: salida,
-
         cantidadPersonas,
         cantidadNoches,
-
         precioPorNoche,
         precioTotal,
-
-        estado: "CONFIRMADA",
+        estado: "CHECK_IN",
         expiraEn: null,
-
         observaciones: "Walk-in, pago en efectivo",
       },
     });
-
     const pago = await tx.pago.create({
       data: {
         reservaId: reserva.id,
@@ -404,14 +348,7 @@ export async function crearReservaWalkIn({
         fechaPago: new Date(),
       },
     });
-
-    return {
-      ...reserva,
-      cliente,
-      habitacion:
-        disponibilidad.habitacion,
-      pago,
-    };
+    return { ...reserva, cliente, habitacion, pago };
   });
 }
 
@@ -575,6 +512,79 @@ export async function crearReservasMultiples({
     }
 
     return reservas;
+  });
+}
+
+function numerosPorPersonas(personas) {
+  if (Number(personas) === 1) return ["1", "2", "3"];
+  if (Number(personas) === 2) return ["4", "5", "6"];
+  if (Number(personas) === 3) return ["7", "8"];
+  return [];
+}
+
+export async function listarHabitacionesDisponiblesWalkIn({ fechaEntrada, fechaSalida, personas }) {
+  const entrada = crearFecha(fechaEntrada);
+  const salida = crearFecha(fechaSalida);
+  const ocupadas = await prisma.reserva.findMany({
+    where: {
+      estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+      fechaEntrada: { lt: salida },
+      fechaSalida: { gt: entrada },
+    },
+    select: { habitacionId: true },
+  });
+  const ocupadasIds = new Set(ocupadas.map((reserva) => reserva.habitacionId));
+  const numeros = numerosPorPersonas(personas);
+  const habitaciones = await prisma.habitacion.findMany({
+    where: { activa: true, estado: "DISPONIBLE", capacidad: { gte: Number(personas) } },
+    orderBy: { numero: "asc" },
+  });
+  return habitaciones.filter((habitacion) =>
+    numeros.includes(String(habitacion.numero)) && !ocupadasIds.has(habitacion.id)
+  );
+}
+
+export async function listarReservasParaCheckIn() {
+  return prisma.reserva.findMany({
+    where: { estado: "CONFIRMADA" },
+    orderBy: { fechaEntrada: "asc" },
+    include: { habitacion: true, cliente: true },
+  });
+}
+
+export async function listarReservasParaCheckout() {
+  return prisma.reserva.findMany({
+    where: { estado: "CHECK_IN" },
+    orderBy: { fechaEntrada: "asc" },
+    include: { habitacion: true, cliente: true },
+  });
+}
+
+export async function registrarCheckInPorHabitacion(habitacionId) {
+  const reserva = await prisma.reserva.findFirst({
+    where: { habitacionId, estado: "CONFIRMADA" },
+    orderBy: { fechaEntrada: "asc" },
+    include: { habitacion: true, cliente: true },
+  });
+  if (!reserva) throw new Error("No hay reserva confirmada para esa habitación.");
+  return prisma.reserva.update({
+    where: { id: reserva.id },
+    data: { estado: "CHECK_IN" },
+    include: { habitacion: true, cliente: true },
+  });
+}
+
+export async function registrarCheckoutPorHabitacion(habitacionId) {
+  const reserva = await prisma.reserva.findFirst({
+    where: { habitacionId, estado: "CHECK_IN" },
+    orderBy: { fechaEntrada: "asc" },
+    include: { habitacion: true, cliente: true },
+  });
+  if (!reserva) throw new Error("No hay habitación ocupada con ese registro.");
+  return prisma.reserva.update({
+    where: { id: reserva.id },
+    data: { estado: "CHECK_OUT" },
+    include: { habitacion: true, cliente: true },
   });
 }
 

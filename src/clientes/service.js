@@ -14,7 +14,14 @@ export async function crearOActualizarCliente({
   }
 
   if (!telefonoLimpio) {
-    throw new Error("El teléfono es obligatorio");
+    return prisma.cliente.create({
+      data: {
+        nombre: nombreLimpio,
+        telefono: null,
+        correo: correo ? String(correo).trim() : null,
+        documento: documento ? String(documento).trim() : null,
+      },
+    });
   }
 
   return prisma.cliente.upsert({

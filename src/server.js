@@ -19,10 +19,29 @@ import {
   detenerSchedulerBackups,
 } from "./backups/scheduler.js";
 
+import {
+  iniciarExpiracionReservas,
+  detenerExpiracionReservas,
+} from "./reservas/expirationScheduler.js";
+
 const PORT = Number(process.env.PORT) || 3000;
 
 let servidor = null;
 let cerrando = false;
+
+function iniciarSchedulers() {
+  iniciarExpiracionReservas();
+  iniciarSchedulerConversaciones();
+  iniciarSchedulerReportes();
+  iniciarSchedulerBackups();
+}
+
+function detenerSchedulers() {
+  detenerExpiracionReservas();
+  detenerSchedulerConversaciones();
+  detenerSchedulerReportes();
+  detenerSchedulerBackups();
+}
 
 async function iniciarServidor() {
   try {
@@ -36,22 +55,25 @@ async function iniciarServidor() {
       );
     });
 
-    iniciarSchedulerConversaciones();
-    iniciarSchedulerReportes();
-    iniciarSchedulerBackups();
-
     await iniciarWhatsApp();
+
+    iniciarSchedulers();
   } catch (error) {
     console.error(
       "❌ Error iniciando el servidor:",
       error
     );
 
-    detenerSchedulerConversaciones();
-    detenerSchedulerReportes();
-    detenerSchedulerBackups();
+    detenerSchedulers();
 
-    await prisma.$disconnect().catch(() => {});
+    if (servidor) {
+      servidor.close();
+      servidor = null;
+    }
+
+    await prisma
+      .$disconnect()
+      .catch(() => {});
 
     process.exit(1);
   }
@@ -68,25 +90,28 @@ async function cerrarServidor(signal) {
     `\n🛑 Cerrando servidor por ${signal}...`
   );
 
-  detenerSchedulerConversaciones();
-  detenerSchedulerReportes();
-  detenerSchedulerBackups();
+  detenerSchedulers();
 
   if (servidor) {
     await new Promise((resolve) => {
       servidor.close(() => {
-        console.log("✅ Servidor HTTP cerrado");
+        console.log(
+          "✅ Servidor HTTP cerrado"
+        );
+
         resolve();
       });
     });
   }
 
-  await prisma.$disconnect().catch((error) => {
-    console.error(
-      "❌ Error desconectando Prisma:",
-      error
-    );
-  });
+  await prisma
+    .$disconnect()
+    .catch((error) => {
+      console.error(
+        "❌ Error desconectando Prisma:",
+        error
+      );
+    });
 
   console.log("✅ Servidor cerrado");
 
@@ -101,20 +126,28 @@ process.on("SIGTERM", () => {
   cerrarServidor("SIGTERM");
 });
 
-process.on("unhandledRejection", (error) => {
-  console.error(
-    "❌ Promesa no controlada:",
-    error
-  );
-});
+process.on(
+  "unhandledRejection",
+  (error) => {
+    console.error(
+      "❌ Promesa no controlada:",
+      error
+    );
+  }
+);
 
-process.on("uncaughtException", (error) => {
-  console.error(
-    "❌ Error no controlado:",
-    error
-  );
+process.on(
+  "uncaughtException",
+  (error) => {
+    console.error(
+      "❌ Error no controlado:",
+      error
+    );
 
-  cerrarServidor("uncaughtException");
-});
+    cerrarServidor(
+      "uncaughtException"
+    );
+  }
+);
 
 iniciarServidor();

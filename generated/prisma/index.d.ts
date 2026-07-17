@@ -2982,7 +2982,7 @@ export namespace Prisma {
   export type ClienteGroupByOutputType = {
     id: string
     nombre: string
-    telefono: string
+    telefono: string | null
     correo: string | null
     documento: string | null
     createdAt: Date
@@ -3064,7 +3064,7 @@ export namespace Prisma {
     scalars: $Extensions.GetPayloadResult<{
       id: string
       nombre: string
-      telefono: string
+      telefono: string | null
       correo: string | null
       documento: string | null
       createdAt: Date
@@ -11297,7 +11297,7 @@ export namespace Prisma {
     NOT?: ClienteWhereInput | ClienteWhereInput[]
     id?: StringFilter<"Cliente"> | string
     nombre?: StringFilter<"Cliente"> | string
-    telefono?: StringFilter<"Cliente"> | string
+    telefono?: StringNullableFilter<"Cliente"> | string | null
     correo?: StringNullableFilter<"Cliente"> | string | null
     documento?: StringNullableFilter<"Cliente"> | string | null
     createdAt?: DateTimeFilter<"Cliente"> | Date | string
@@ -11308,7 +11308,7 @@ export namespace Prisma {
   export type ClienteOrderByWithRelationInput = {
     id?: SortOrder
     nombre?: SortOrder
-    telefono?: SortOrder
+    telefono?: SortOrderInput | SortOrder
     correo?: SortOrderInput | SortOrder
     documento?: SortOrderInput | SortOrder
     createdAt?: SortOrder
@@ -11333,7 +11333,7 @@ export namespace Prisma {
   export type ClienteOrderByWithAggregationInput = {
     id?: SortOrder
     nombre?: SortOrder
-    telefono?: SortOrder
+    telefono?: SortOrderInput | SortOrder
     correo?: SortOrderInput | SortOrder
     documento?: SortOrderInput | SortOrder
     createdAt?: SortOrder
@@ -11349,7 +11349,7 @@ export namespace Prisma {
     NOT?: ClienteScalarWhereWithAggregatesInput | ClienteScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"Cliente"> | string
     nombre?: StringWithAggregatesFilter<"Cliente"> | string
-    telefono?: StringWithAggregatesFilter<"Cliente"> | string
+    telefono?: StringNullableWithAggregatesFilter<"Cliente"> | string | null
     correo?: StringNullableWithAggregatesFilter<"Cliente"> | string | null
     documento?: StringNullableWithAggregatesFilter<"Cliente"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Cliente"> | Date | string
@@ -11943,7 +11943,7 @@ export namespace Prisma {
   export type ClienteCreateInput = {
     id?: string
     nombre: string
-    telefono: string
+    telefono?: string | null
     correo?: string | null
     documento?: string | null
     createdAt?: Date | string
@@ -11954,7 +11954,7 @@ export namespace Prisma {
   export type ClienteUncheckedCreateInput = {
     id?: string
     nombre: string
-    telefono: string
+    telefono?: string | null
     correo?: string | null
     documento?: string | null
     createdAt?: Date | string
@@ -11965,7 +11965,7 @@ export namespace Prisma {
   export type ClienteUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     nombre?: StringFieldUpdateOperationsInput | string
-    telefono?: StringFieldUpdateOperationsInput | string
+    telefono?: NullableStringFieldUpdateOperationsInput | string | null
     correo?: NullableStringFieldUpdateOperationsInput | string | null
     documento?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -11976,7 +11976,7 @@ export namespace Prisma {
   export type ClienteUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     nombre?: StringFieldUpdateOperationsInput | string
-    telefono?: StringFieldUpdateOperationsInput | string
+    telefono?: NullableStringFieldUpdateOperationsInput | string | null
     correo?: NullableStringFieldUpdateOperationsInput | string | null
     documento?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -11987,7 +11987,7 @@ export namespace Prisma {
   export type ClienteCreateManyInput = {
     id?: string
     nombre: string
-    telefono: string
+    telefono?: string | null
     correo?: string | null
     documento?: string | null
     createdAt?: Date | string
@@ -11997,7 +11997,7 @@ export namespace Prisma {
   export type ClienteUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
     nombre?: StringFieldUpdateOperationsInput | string
-    telefono?: StringFieldUpdateOperationsInput | string
+    telefono?: NullableStringFieldUpdateOperationsInput | string | null
     correo?: NullableStringFieldUpdateOperationsInput | string | null
     documento?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -12007,7 +12007,7 @@ export namespace Prisma {
   export type ClienteUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     nombre?: StringFieldUpdateOperationsInput | string
-    telefono?: StringFieldUpdateOperationsInput | string
+    telefono?: NullableStringFieldUpdateOperationsInput | string | null
     correo?: NullableStringFieldUpdateOperationsInput | string | null
     documento?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -14180,7 +14180,7 @@ export namespace Prisma {
   export type ClienteCreateWithoutReservasInput = {
     id?: string
     nombre: string
-    telefono: string
+    telefono?: string | null
     correo?: string | null
     documento?: string | null
     createdAt?: Date | string
@@ -14190,7 +14190,7 @@ export namespace Prisma {
   export type ClienteUncheckedCreateWithoutReservasInput = {
     id?: string
     nombre: string
-    telefono: string
+    telefono?: string | null
     correo?: string | null
     documento?: string | null
     createdAt?: Date | string
@@ -14280,7 +14280,7 @@ export namespace Prisma {
   export type ClienteUpdateWithoutReservasInput = {
     id?: StringFieldUpdateOperationsInput | string
     nombre?: StringFieldUpdateOperationsInput | string
-    telefono?: StringFieldUpdateOperationsInput | string
+    telefono?: NullableStringFieldUpdateOperationsInput | string | null
     correo?: NullableStringFieldUpdateOperationsInput | string | null
     documento?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -14290,7 +14290,7 @@ export namespace Prisma {
   export type ClienteUncheckedUpdateWithoutReservasInput = {
     id?: StringFieldUpdateOperationsInput | string
     nombre?: StringFieldUpdateOperationsInput | string
-    telefono?: StringFieldUpdateOperationsInput | string
+    telefono?: NullableStringFieldUpdateOperationsInput | string | null
     correo?: NullableStringFieldUpdateOperationsInput | string | null
     documento?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
