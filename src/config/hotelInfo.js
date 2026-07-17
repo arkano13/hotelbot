@@ -16,7 +16,7 @@ export const hotelInfo = {
 
   horarios: {
     checkIn: "2:00 PM",
-    checkOut: "12:00 PM",
+    horaCheckOut: 13,
     atencion: "24 horas",
   },
 
@@ -53,3 +53,11 @@ export const hotelInfo = {
       "Consultar con recepción sobre accesibilidad para sillas de ruedas.",
   },
 };
+
+export function obtenerHoraCheckOutTexto() {
+  const hora = hotelInfo.horarios.horaCheckOut;
+  const periodo = hora >= 12 ? "PM" : "AM";
+  const hora12 = hora % 12 === 0 ? 12 : hora % 12;
+
+  return `${hora12}:00 ${periodo}`;
+}

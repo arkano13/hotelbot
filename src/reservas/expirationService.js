@@ -1,7 +1,8 @@
 import { prisma } from "../lib/prisma.js";
+import { hotelInfo } from "../config/hotelInfo.js";
 
 const ZONA_HORARIA = "America/Tegucigalpa";
-const HORA_CHECKOUT = 11;
+const HORA_CHECKOUT = hotelInfo.horarios.horaCheckOut;
 
 function obtenerFechaHoraHonduras() {
   const formateador = new Intl.DateTimeFormat("en-CA", {

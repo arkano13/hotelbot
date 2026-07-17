@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { registrarAuditoria } from "../auditoria/service.js";
 
 const ESTADOS_VALIDOS = [
   "NO_GENERADO",
@@ -274,7 +275,16 @@ export async function obtenerPagoPorCodigo(codigo) {
 
 export async function aprobarPagoPorCodigo(codigo) {
   const pago = await obtenerPagoPorCodigo(codigo);
-  return aprobarPagoSeguro(pago.id);
+  const resultado = await aprobarPagoSeguro(pago.id);
+
+  await registrarAuditoria({
+    accion: "APROBAR_PAGO",
+    entidad: "Pago",
+    entidadId: pago.id,
+    detalle: `${codigo} · ${resultado.reserva.codigo} · Hab. ${resultado.reserva.habitacion.numero}`,
+  });
+
+  return resultado;
 }
 
 export async function rechazarPagoPorCodigo(codigo, motivo) {
@@ -284,7 +294,7 @@ export async function rechazarPagoPorCodigo(codigo, motivo) {
     throw new Error("Este pago ya fue aprobado, no se puede rechazar");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const resultado = await prisma.$transaction(async (tx) => {
     if (pago.reserva.estado === "PENDIENTE_PAGO") {
       await tx.reserva.update({
         where: {
@@ -314,6 +324,15 @@ export async function rechazarPagoPorCodigo(codigo, motivo) {
       },
     });
   });
+
+  await registrarAuditoria({
+    accion: "RECHAZAR_PAGO",
+    entidad: "Pago",
+    entidadId: pago.id,
+    detalle: `${codigo} · ${resultado.reserva.codigo} · motivo: ${motivo?.trim() || "sin motivo"}`,
+  });
+
+  return resultado;
 }
 
 export async function crearPago(reservaId) {

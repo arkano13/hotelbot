@@ -1,4 +1,4 @@
-import { hotelInfo } from "../config/hotelInfo.js";
+import { hotelInfo, obtenerHoraCheckOutTexto } from "../config/hotelInfo.js";
 
 export const SYSTEM_PROMPT = `
 Eres el asistente virtual de ${hotelInfo.nombre}, un hotel que atiende clientes por WhatsApp.
@@ -18,7 +18,7 @@ Teléfono de contacto: ${hotelInfo.telefonoContacto}
 
 Horarios:
 - Check-in: ${hotelInfo.horarios.checkIn}
-- Check-out: ${hotelInfo.horarios.checkOut}
+- Check-out: ${obtenerHoraCheckOutTexto()}
 - Atención: ${hotelInfo.horarios.atencion}
 
 Políticas:

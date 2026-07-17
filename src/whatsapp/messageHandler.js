@@ -30,6 +30,8 @@ import {
   registrarCheckInPorHabitacion,
   registrarCheckoutPorHabitacion,
   cancelarReservaPorId,
+  listarHabitacionesParaMantenimiento,
+  alternarMantenimientoHabitacion,
 } from "../reservas/service.js";
 
 const loggerDescarga = pino({ level: "silent" });
@@ -168,7 +170,8 @@ async function enviarMenuJefe(socket, jid) {
       "2️⃣ Check-in\n" +
       "3️⃣ Checkout\n" +
       "4️⃣ Cambiar modo BOT/HUMANO\n" +
-      "5️⃣ Cancelar reserva\n\n" +
+      "5️⃣ Cancelar reserva\n" +
+      "6️⃣ Habilitar/deshabilitar habitación\n\n" +
       "Responde con un número.",
   });
 }
@@ -230,6 +233,23 @@ async function enviarSeleccionReservasCancelar(socket, jid, reservas) {
   });
 }
 
+async function enviarSeleccionMantenimiento(socket, jid, habitaciones) {
+  if (!habitaciones.length) {
+    await socket.sendMessage(jid, { text: "No hay habitaciones registradas." });
+    return;
+  }
+
+  await socket.sendMessage(jid, {
+    text:
+      "Selecciona la habitación que quieres habilitar o deshabilitar:\n\n" +
+      habitaciones.map((habitacion, indice) => {
+        const estadoTexto =
+          habitacion.estado === "MANTENIMIENTO" ? "🔧 en mantenimiento" : "✅ disponible";
+        return `${indice + 1}. Habitación ${habitacion.numero} (${estadoTexto})`;
+      }).join("\n"),
+  });
+}
+
 async function procesarFlujoJefe({ socket, jid, texto }) {
   const textoNormalizado = texto.toLowerCase();
   if (textoNormalizado === "/menu" || textoNormalizado.startsWith("jefe:menu:")) return false;
@@ -265,23 +285,6 @@ async function procesarFlujoJefe({ socket, jid, texto }) {
       });
       await socket.sendMessage(jid, {
         text: `✅ Habitación ${reserva.habitacion.numero} ocupada automáticamente.\nReserva: ${reserva.codigo}\nCliente: ${reserva.cliente.nombre}\nPago: efectivo confirmado.`,
-      });
-    } catch (error) {
-      await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
-    }
-    flujosJefe.delete(jid);
-    return true;
-  }
-
-  if (flujo.tipo === "OCUPAR_HABITACION" && texto.startsWith("jefe:room:ocupar:")) {
-    try {
-      const reserva = await crearReservaWalkIn({
-        ...flujo.datos,
-        habitacionId: texto.split(":").pop(),
-        noches: undefined,
-      });
-      await socket.sendMessage(jid, {
-        text: `✅ Habitación ${reserva.habitacion.numero} ocupada.\nReserva: ${reserva.codigo}\nCliente: ${reserva.cliente.nombre}\nPago: efectivo confirmado.`,
       });
     } catch (error) {
       await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
@@ -340,6 +343,33 @@ async function procesarFlujoJefe({ socket, jid, texto }) {
             "De acuerdo con la política del hotel, los pagos de reservación no son reembolsables.",
         });
       }
+    } catch (error) {
+      await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
+    }
+
+    flujosJefe.delete(jid);
+    return true;
+  }
+
+  if (flujo.tipo === "MANTENIMIENTO" && /^\d+$/.test(texto)) {
+    const indice = Number(texto) - 1;
+    const seleccionada = flujo.habitaciones?.[indice];
+
+    if (!seleccionada) {
+      await socket.sendMessage(jid, {
+        text: "Número inválido. Elige una habitación de la lista.",
+      });
+      return true;
+    }
+
+    try {
+      const habitacion = await alternarMantenimientoHabitacion(seleccionada.id);
+      const mensaje =
+        habitacion.estado === "MANTENIMIENTO"
+          ? `🔧 Habitación ${habitacion.numero} puesta en mantenimiento. Ya no aparecerá disponible para nuevas reservas.`
+          : `✅ Habitación ${habitacion.numero} habilitada de nuevo.`;
+
+      await socket.sendMessage(jid, { text: mensaje });
     } catch (error) {
       await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
     }
@@ -553,6 +583,13 @@ async function procesarComandoJefe({ socket, jid, texto }) {
     const reservas = await listarReservasParaCancelar();
     flujosJefe.set(jid, { tipo: "CANCELAR", reservas });
     await enviarSeleccionReservasCancelar(socket, jid, reservas);
+    return;
+  }
+
+  if (["jefe:menu:6", "6"].includes(comando)) {
+    const habitaciones = await listarHabitacionesParaMantenimiento();
+    flujosJefe.set(jid, { tipo: "MANTENIMIENTO", habitaciones });
+    await enviarSeleccionMantenimiento(socket, jid, habitaciones);
     return;
   }
 

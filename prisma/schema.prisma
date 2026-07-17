@@ -219,3 +219,19 @@ model Message {
   @@index([conversationId, createdAt])
   @@map("messages")
 }
+
+model Auditoria {
+  id String @id @default(uuid())
+
+  accion String
+  entidad String
+  entidadId String?
+  detalle String?
+
+  createdAt DateTime @default(now())
+
+  @@index([accion])
+  @@index([entidad, entidadId])
+  @@index([createdAt])
+  @@map("auditoria")
+}

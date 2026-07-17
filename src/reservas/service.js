@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { registrarAuditoria } from "../auditoria/service.js";
 
 import { crearOActualizarCliente } from "../clientes/service.js";
 
@@ -390,6 +391,15 @@ export async function crearReservaWalkIn({
       },
     });
     return { ...reserva, cliente, habitacion, pago };
+  }).then(async (resultado) => {
+    await registrarAuditoria({
+      accion: "OCUPAR_WALKIN",
+      entidad: "Reserva",
+      entidadId: resultado.id,
+      detalle: `${resultado.codigo} · Hab. ${resultado.habitacion.numero} · ${resultado.cliente.nombre}`,
+    });
+
+    return resultado;
   });
 }
 
@@ -622,7 +632,6 @@ export async function listarReservasParaCancelar() {
   return prisma.reserva.findMany({
     where: {
       estado: "CONFIRMADA",
-      fechaEntrada: { gt: new Date() },
     },
     orderBy: { fechaEntrada: "asc" },
     include: {
@@ -651,7 +660,7 @@ export async function cancelarReservaPorId(reservaId) {
     throw new Error(`La reserva está en estado ${reserva.estado} y no se puede cancelar desde este menú.`);
   }
 
-  return prisma.reserva.update({
+  const reservaActualizada = await prisma.reserva.update({
     where: { id: reserva.id },
     data: {
       estado: "CANCELADA",
@@ -663,6 +672,15 @@ export async function cancelarReservaPorId(reservaId) {
       pago: true,
     },
   });
+
+  await registrarAuditoria({
+    accion: "CANCELAR_RESERVA",
+    entidad: "Reserva",
+    entidadId: reservaActualizada.id,
+    detalle: `${reservaActualizada.codigo} · Hab. ${reservaActualizada.habitacion.numero} · ${reservaActualizada.cliente.nombre}`,
+  });
+
+  return reservaActualizada;
 }
 
 export async function registrarCheckInPorHabitacion(habitacionId) {
@@ -682,11 +700,21 @@ export async function registrarCheckInPorHabitacion(habitacionId) {
     include: { habitacion: true, cliente: true },
   });
   if (!reserva) throw new Error("No hay reserva confirmada para esa habitación.");
-  return prisma.reserva.update({
+
+  const reservaActualizada = await prisma.reserva.update({
     where: { id: reserva.id },
     data: { estado: "CHECK_IN" },
     include: { habitacion: true, cliente: true },
   });
+
+  await registrarAuditoria({
+    accion: "CHECK_IN",
+    entidad: "Reserva",
+    entidadId: reservaActualizada.id,
+    detalle: `${reservaActualizada.codigo} · Hab. ${reservaActualizada.habitacion.numero} · ${reservaActualizada.cliente.nombre}`,
+  });
+
+  return reservaActualizada;
 }
 
 export async function registrarCheckoutPorHabitacion(habitacionId) {
@@ -696,11 +724,21 @@ export async function registrarCheckoutPorHabitacion(habitacionId) {
     include: { habitacion: true, cliente: true },
   });
   if (!reserva) throw new Error("No hay habitación ocupada con ese registro.");
-  return prisma.reserva.update({
+
+  const reservaActualizada = await prisma.reserva.update({
     where: { id: reserva.id },
     data: { estado: "CHECK_OUT" },
     include: { habitacion: true, cliente: true },
   });
+
+  await registrarAuditoria({
+    accion: "CHECKOUT",
+    entidad: "Reserva",
+    entidadId: reservaActualizada.id,
+    detalle: `${reservaActualizada.codigo} · Hab. ${reservaActualizada.habitacion.numero} · ${reservaActualizada.cliente.nombre}`,
+  });
+
+  return reservaActualizada;
 }
 
 export async function obtenerReservaMasRecientePorTelefono(
@@ -797,7 +835,7 @@ export async function liberarReservaPorCodigo(codigo) {
     );
   }
 
-  return prisma.reserva.update({
+  const reservaActualizada = await prisma.reserva.update({
     where: {
       id: reserva.id,
     },
@@ -809,4 +847,80 @@ export async function liberarReservaPorCodigo(codigo) {
       habitacion: true,
     },
   });
+
+  await registrarAuditoria({
+    accion: "LIBERAR_MANUAL",
+    entidad: "Reserva",
+    entidadId: reservaActualizada.id,
+    detalle: `${reservaActualizada.codigo} · Hab. ${reservaActualizada.habitacion.numero} · ${reservaActualizada.cliente.nombre}`,
+  });
+
+  return reservaActualizada;
+}
+
+export async function listarHabitacionesParaMantenimiento() {
+  return prisma.habitacion.findMany({
+    where: {
+      activa: true,
+    },
+    orderBy: {
+      numero: "asc",
+    },
+  });
+}
+
+export async function alternarMantenimientoHabitacion(habitacionId) {
+  const habitacion = await prisma.habitacion.findUnique({
+    where: {
+      id: habitacionId,
+    },
+  });
+
+  if (!habitacion) {
+    throw new Error("Habitación no encontrada");
+  }
+
+  if (habitacion.estado === "DISPONIBLE") {
+    const ocupada = await prisma.reserva.findFirst({
+      where: {
+        habitacionId: habitacion.id,
+        estado: {
+          in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"],
+        },
+        fechaSalida: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    if (ocupada) {
+      throw new Error(
+        `La habitación ${habitacion.numero} tiene una reserva activa (${ocupada.codigo}) y no se puede poner en mantenimiento`
+      );
+    }
+  }
+
+  const nuevoEstado =
+    habitacion.estado === "MANTENIMIENTO" ? "DISPONIBLE" : "MANTENIMIENTO";
+
+  const habitacionActualizada = await prisma.habitacion.update({
+    where: {
+      id: habitacion.id,
+    },
+    data: {
+      estado: nuevoEstado,
+    },
+  });
+
+  await registrarAuditoria({
+    accion:
+      nuevoEstado === "MANTENIMIENTO"
+        ? "HABILITAR_MANTENIMIENTO"
+        : "DESHABILITAR_MANTENIMIENTO",
+    entidad: "Habitacion",
+    entidadId: habitacionActualizada.id,
+    detalle: `Habitación ${habitacionActualizada.numero}`,
+  });
+
+  return habitacionActualizada;
 }
