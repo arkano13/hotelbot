@@ -3,8 +3,7 @@ import {
   procesarCheckoutsAutomaticos,
 } from "./expirationService.js";
 
-const INTERVALO_REVISION_MS =
-  60 * 1000;
+const INTERVALO_REVISION_MS = 60 * 1000;
 
 let intervalo = null;
 let ejecutando = false;
@@ -18,20 +17,9 @@ async function revisarReservas() {
 
   try {
     await expirarReservasPendientes();
-  } catch (error) {
-    console.error(
-      "❌ Error verificando reservas expiradas:",
-      error
-    );
-  }
-
-  try {
     await procesarCheckoutsAutomaticos();
   } catch (error) {
-    console.error(
-      "❌ Error procesando checkouts automáticos:",
-      error
-    );
+    console.error("❌ Error ejecutando scheduler de reservas:", error);
   } finally {
     ejecutando = false;
   }
@@ -43,7 +31,7 @@ export function iniciarExpiracionReservas() {
   }
 
   console.log(
-    "✅ Scheduler de reservas iniciado: revisión cada 1 minuto"
+    "✅ Scheduler de reservas iniciado: expiraciones cada minuto y checkout a las 11:00 AM Honduras"
   );
 
   revisarReservas().catch(console.error);
@@ -61,7 +49,5 @@ export function detenerExpiracionReservas() {
   clearInterval(intervalo);
   intervalo = null;
 
-  console.log(
-    "🛑 Scheduler de reservas detenido"
-  );
+  console.log("🛑 Scheduler de reservas detenido");
 }

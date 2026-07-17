@@ -3,3 +3,5 @@ node_modules/
 auth_info_baileys/
 uploads/
 *.log
+scheduler-reportes.json
+scheduler-reportes.json.tmp

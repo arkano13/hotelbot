@@ -9,6 +9,24 @@ const ESTADOS_VALIDOS = [
   "REEMBOLSADO",
 ];
 
+async function ejecutarTransaccionSerializable(operacion, intentosMaximos = 3) {
+  for (let intento = 1; intento <= intentosMaximos; intento++) {
+    try {
+      return await prisma.$transaction(operacion, {
+        isolationLevel: "Serializable",
+      });
+    } catch (error) {
+      const conflictoConcurrente = error?.code === "P2034";
+
+      if (!conflictoConcurrente || intento === intentosMaximos) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("No se pudo aprobar el pago por concurrencia.");
+}
+
 async function generarCodigoPago() {
   while (true) {
     const codigo = `P${Math.floor(1000 + Math.random() * 9000)}`;
@@ -28,7 +46,132 @@ async function generarCodigoPago() {
   }
 }
 
-export async function registrarComprobante({ reservaId, comprobanteUrl }) {
+async function buscarHabitacionDisponible(tx, reserva) {
+  const habitaciones = await tx.habitacion.findMany({
+    where: {
+      activa: true,
+      estado: "DISPONIBLE",
+      capacidad: reserva.cantidadPersonas,
+    },
+    orderBy: {
+      numero: "asc",
+    },
+  });
+
+  const ordenadas = [
+    ...habitaciones.filter((habitacion) => habitacion.id === reserva.habitacionId),
+    ...habitaciones.filter((habitacion) => habitacion.id !== reserva.habitacionId),
+  ];
+
+  for (const habitacion of ordenadas) {
+    const conflicto = await tx.reserva.findFirst({
+      where: {
+        id: {
+          not: reserva.id,
+        },
+        habitacionId: habitacion.id,
+        estado: {
+          in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"],
+        },
+        fechaEntrada: {
+          lt: reserva.fechaSalida,
+        },
+        fechaSalida: {
+          gt: reserva.fechaEntrada,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!conflicto) {
+      return habitacion;
+    }
+  }
+
+  return null;
+}
+
+async function aprobarPagoSeguro(id) {
+  return ejecutarTransaccionSerializable(async (tx) => {
+    const pago = await tx.pago.findUnique({
+      where: {
+        id,
+      },
+      include: {
+        reserva: {
+          include: {
+            cliente: true,
+            habitacion: true,
+          },
+        },
+      },
+    });
+
+    if (!pago) {
+      throw new Error("Pago no encontrado");
+    }
+
+    if (pago.estado === "APROBADO") {
+      throw new Error("Este pago ya fue aprobado anteriormente");
+    }
+
+    const reserva = pago.reserva;
+
+    if (["CANCELADA", "CHECK_IN", "CHECK_OUT"].includes(reserva.estado)) {
+      throw new Error(
+        `La reserva está en estado ${reserva.estado} y el pago no puede aprobarse`
+      );
+    }
+
+    const habitacion = await buscarHabitacionDisponible(tx, reserva);
+
+    if (!habitacion) {
+      throw new Error(
+        "El pago llegó tarde y ya no hay una habitación disponible para esas fechas. No lo apruebes."
+      );
+    }
+
+    const pagoActualizado = await tx.pago.update({
+      where: {
+        id: pago.id,
+      },
+      data: {
+        estado: "APROBADO",
+        fechaPago: new Date(),
+        motivoRechazo: null,
+      },
+    });
+
+    const reservaActualizada = await tx.reserva.update({
+      where: {
+        id: reserva.id,
+      },
+      data: {
+        habitacionId: habitacion.id,
+        estado: "CONFIRMADA",
+        expiraEn: null,
+      },
+      include: {
+        cliente: true,
+        habitacion: true,
+        pago: true,
+      },
+    });
+
+    return {
+      pago: pagoActualizado,
+      reserva: reservaActualizada,
+      reasignada: habitacion.id !== reserva.habitacionId,
+    };
+  });
+}
+
+export async function registrarComprobante({
+  reservaId,
+  comprobanteUrl,
+}) {
   const reserva = await prisma.reserva.findUnique({
     where: {
       id: reservaId,
@@ -43,7 +186,7 @@ export async function registrarComprobante({ reservaId, comprobanteUrl }) {
     throw new Error("Reserva no encontrada");
   }
 
-  if (reserva.estado === "CANCELADA" || reserva.estado === "EXPIRADA") {
+  if (["CANCELADA", "CHECK_IN", "CHECK_OUT"].includes(reserva.estado)) {
     throw new Error("La reserva ya no puede recibir comprobantes");
   }
 
@@ -64,24 +207,41 @@ export async function registrarComprobante({ reservaId, comprobanteUrl }) {
   }
 
   const codigo = pago.codigo ?? (await generarCodigoPago());
+  const llegoATiempo =
+    reserva.estado === "PENDIENTE_PAGO" &&
+    (!reserva.expiraEn || reserva.expiraEn > new Date());
 
-  return prisma.pago.update({
-    where: {
-      id: pago.id,
-    },
-    data: {
-      codigo,
-      comprobanteUrl,
-      estado: "PENDIENTE",
-      motivoRechazo: null,
-    },
-    include: {
-      reserva: {
-        include: {
-          cliente: true,
+  return prisma.$transaction(async (tx) => {
+    if (llegoATiempo) {
+      await tx.reserva.update({
+        where: {
+          id: reserva.id,
+        },
+        data: {
+          expiraEn: null,
+        },
+      });
+    }
+
+    return tx.pago.update({
+      where: {
+        id: pago.id,
+      },
+      data: {
+        codigo,
+        comprobanteUrl,
+        estado: "PENDIENTE",
+        motivoRechazo: null,
+      },
+      include: {
+        reserva: {
+          include: {
+            cliente: true,
+            habitacion: true,
+          },
         },
       },
-    },
+    });
   });
 }
 
@@ -114,12 +274,7 @@ export async function obtenerPagoPorCodigo(codigo) {
 
 export async function aprobarPagoPorCodigo(codigo) {
   const pago = await obtenerPagoPorCodigo(codigo);
-
-  if (pago.estado === "APROBADO") {
-    throw new Error("Este pago ya fue aprobado anteriormente");
-  }
-
-  return actualizarEstadoPago(pago.id, "APROBADO");
+  return aprobarPagoSeguro(pago.id);
 }
 
 export async function rechazarPagoPorCodigo(codigo, motivo) {
@@ -129,21 +284,35 @@ export async function rechazarPagoPorCodigo(codigo, motivo) {
     throw new Error("Este pago ya fue aprobado, no se puede rechazar");
   }
 
-  return prisma.pago.update({
-    where: {
-      id: pago.id,
-    },
-    data: {
-      estado: "RECHAZADO",
-      motivoRechazo: motivo?.trim() || "Sin motivo especificado",
-    },
-    include: {
-      reserva: {
-        include: {
-          cliente: true,
+  return prisma.$transaction(async (tx) => {
+    if (pago.reserva.estado === "PENDIENTE_PAGO") {
+      await tx.reserva.update({
+        where: {
+          id: pago.reservaId,
+        },
+        data: {
+          expiraEn: new Date(Date.now() + 30 * 60 * 1000),
+        },
+      });
+    }
+
+    return tx.pago.update({
+      where: {
+        id: pago.id,
+      },
+      data: {
+        estado: "RECHAZADO",
+        motivoRechazo: motivo?.trim() || "Sin motivo especificado",
+      },
+      include: {
+        reserva: {
+          include: {
+            cliente: true,
+            habitacion: true,
+          },
         },
       },
-    },
+    });
   });
 }
 
@@ -245,6 +414,10 @@ export async function actualizarEstadoPago(id, estado) {
     throw new Error("Estado de pago inválido");
   }
 
+  if (estadoNormalizado === "APROBADO") {
+    return aprobarPagoSeguro(id);
+  }
+
   const pago = await prisma.pago.findUnique({
     where: {
       id,
@@ -253,6 +426,7 @@ export async function actualizarEstadoPago(id, estado) {
       reserva: {
         include: {
           cliente: true,
+          habitacion: true,
         },
       },
     },
@@ -269,29 +443,10 @@ export async function actualizarEstadoPago(id, estado) {
       },
       data: {
         estado: estadoNormalizado,
-        fechaPago:
-          estadoNormalizado === "APROBADO"
-            ? new Date()
-            : pago.fechaPago,
       },
     });
 
     let reservaActualizada = pago.reserva;
-
-    if (estadoNormalizado === "APROBADO") {
-      reservaActualizada = await tx.reserva.update({
-        where: {
-          id: pago.reservaId,
-        },
-        data: {
-          estado: "CONFIRMADA",
-          expiraEn: null,
-        },
-        include: {
-          cliente: true,
-        },
-      });
-    }
 
     if (
       estadoNormalizado === "VENCIDO" &&
@@ -303,6 +458,10 @@ export async function actualizarEstadoPago(id, estado) {
         },
         data: {
           estado: "EXPIRADA",
+        },
+        include: {
+          cliente: true,
+          habitacion: true,
         },
       });
     }

@@ -11,6 +11,24 @@ import { obtenerTarifaPorPersonas } from "../tarifas/service.js";
 
 const MINUTOS_EXPIRACION = 30;
 
+async function ejecutarTransaccionSerializable(operacion, intentosMaximos = 3) {
+  for (let intento = 1; intento <= intentosMaximos; intento++) {
+    try {
+      return await prisma.$transaction(operacion, {
+        isolationLevel: "Serializable",
+      });
+    } catch (error) {
+      const conflictoConcurrente = error?.code === "P2034";
+
+      if (!conflictoConcurrente || intento === intentosMaximos) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("No se pudo completar la reserva por concurrencia.");
+}
+
 function crearFecha(fecha) {
   return new Date(`${fecha}T00:00:00`);
 }
@@ -190,7 +208,7 @@ export async function crearReservaTemporal({
       MINUTOS_EXPIRACION * 60 * 1000
   );
 
-  return prisma.$transaction(async (tx) => {
+  return ejecutarTransaccionSerializable(async (tx) => {
     const conflicto = await tx.reserva.findFirst({
       where: {
         habitacionId:
@@ -292,11 +310,20 @@ export async function crearReservaWalkIn({
     throw new Error("Para más de 3 personas se necesitan varias habitaciones.");
   }
 
-  const habitacion = await prisma.habitacion.findFirst({
-    where: habitacionId
-      ? { id: habitacionId, activa: true, estado: "DISPONIBLE" }
-      : { activa: true, estado: "DISPONIBLE", capacidad: { gte: cantidadPersonas } },
-  });
+  let habitacion;
+
+  if (habitacionId) {
+    habitacion = await prisma.habitacion.findFirst({
+      where: { id: habitacionId, activa: true, estado: "DISPONIBLE" },
+    });
+  } else {
+    const disponibles = await listarHabitacionesDisponiblesWalkIn({
+      fechaEntrada,
+      fechaSalida,
+      personas: cantidadPersonas,
+    });
+    habitacion = disponibles[0];
+  }
 
   if (!habitacion || habitacion.capacidad < cantidadPersonas) {
     throw new Error("La habitación seleccionada no está disponible.");
@@ -321,7 +348,21 @@ export async function crearReservaWalkIn({
     ? await crearOActualizarCliente({ nombre: nombreLimpio, telefono: telefonoLimpio })
     : await prisma.cliente.create({ data: { nombre: nombreLimpio, telefono: null } });
 
-  return prisma.$transaction(async (tx) => {
+  return ejecutarTransaccionSerializable(async (tx) => {
+    const conflictoDentroDeTransaccion = await tx.reserva.findFirst({
+      where: {
+        habitacionId: habitacion.id,
+        estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+        fechaEntrada: { lt: salida },
+        fechaSalida: { gt: entrada },
+      },
+      select: { id: true },
+    });
+
+    if (conflictoDentroDeTransaccion) {
+      throw new Error("La habitación dejó de estar disponible.");
+    }
+
     const codigo = await generarCodigoUnico(tx);
     const reserva = await tx.reserva.create({
       data: {
@@ -411,7 +452,7 @@ export async function crearReservasMultiples({
       MINUTOS_EXPIRACION * 60 * 1000
   );
 
-  return prisma.$transaction(async (tx) => {
+  return ejecutarTransaccionSerializable(async (tx) => {
     const reservas = [];
 
     for (
@@ -545,24 +586,98 @@ export async function listarHabitacionesDisponiblesWalkIn({ fechaEntrada, fechaS
 }
 
 export async function listarReservasParaCheckIn() {
-  return prisma.reserva.findMany({
-    where: { estado: "CONFIRMADA" },
+  const inicio = new Date();
+  inicio.setHours(0, 0, 0, 0);
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + 1);
+
+  const reservas = await prisma.reserva.findMany({
+    where: {
+      estado: "CONFIRMADA",
+      fechaEntrada: { lt: fin },
+      fechaSalida: { gt: inicio },
+    },
     orderBy: { fechaEntrada: "asc" },
     include: { habitacion: true, cliente: true },
   });
+
+  return Array.from(
+    new Map(reservas.map((reserva) => [reserva.habitacionId, reserva])).values()
+  );
 }
 
 export async function listarReservasParaCheckout() {
-  return prisma.reserva.findMany({
+  const reservas = await prisma.reserva.findMany({
     where: { estado: "CHECK_IN" },
     orderBy: { fechaEntrada: "asc" },
     include: { habitacion: true, cliente: true },
   });
+
+  return Array.from(
+    new Map(reservas.map((reserva) => [reserva.habitacionId, reserva])).values()
+  );
+}
+
+export async function listarReservasParaCancelar() {
+  return prisma.reserva.findMany({
+    where: {
+      estado: "CONFIRMADA",
+      fechaEntrada: { gt: new Date() },
+    },
+    orderBy: { fechaEntrada: "asc" },
+    include: {
+      habitacion: true,
+      cliente: true,
+      pago: true,
+    },
+  });
+}
+
+export async function cancelarReservaPorId(reservaId) {
+  const reserva = await prisma.reserva.findUnique({
+    where: { id: reservaId },
+    include: {
+      habitacion: true,
+      cliente: true,
+      pago: true,
+    },
+  });
+
+  if (!reserva) {
+    throw new Error("Reserva no encontrada.");
+  }
+
+  if (reserva.estado !== "CONFIRMADA") {
+    throw new Error(`La reserva está en estado ${reserva.estado} y no se puede cancelar desde este menú.`);
+  }
+
+  return prisma.reserva.update({
+    where: { id: reserva.id },
+    data: {
+      estado: "CANCELADA",
+      expiraEn: null,
+    },
+    include: {
+      habitacion: true,
+      cliente: true,
+      pago: true,
+    },
+  });
 }
 
 export async function registrarCheckInPorHabitacion(habitacionId) {
+  const inicio = new Date();
+  inicio.setHours(0, 0, 0, 0);
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + 1);
+
   const reserva = await prisma.reserva.findFirst({
-    where: { habitacionId, estado: "CONFIRMADA" },
+    where: {
+      habitacionId,
+      estado: "CONFIRMADA",
+      fechaEntrada: { lt: fin },
+      fechaSalida: { gt: inicio },
+    },
     orderBy: { fechaEntrada: "asc" },
     include: { habitacion: true, cliente: true },
   });

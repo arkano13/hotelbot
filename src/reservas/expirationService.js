@@ -1,5 +1,33 @@
 import { prisma } from "../lib/prisma.js";
 
+const ZONA_HORARIA = "America/Tegucigalpa";
+const HORA_CHECKOUT = 11;
+
+function obtenerFechaHoraHonduras() {
+  const formateador = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ZONA_HORARIA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+
+  const partes = Object.fromEntries(
+    formateador
+      .formatToParts(new Date())
+      .filter((parte) => parte.type !== "literal")
+      .map((parte) => [parte.type, parte.value])
+  );
+
+  return {
+    fechaISO: `${partes.year}-${partes.month}-${partes.day}`,
+    hora: Number(partes.hour),
+    minuto: Number(partes.minute),
+  };
+}
+
 export async function expirarReservasPendientes() {
   const ahora = new Date();
 
@@ -7,6 +35,7 @@ export async function expirarReservasPendientes() {
     where: {
       estado: "PENDIENTE_PAGO",
       expiraEn: {
+        not: null,
         lte: ahora,
       },
     },
@@ -15,20 +44,33 @@ export async function expirarReservasPendientes() {
     },
   });
 
+  let cantidadExpirada = 0;
+
   for (const reserva of reservasVencidas) {
-    await prisma.$transaction(async (tx) => {
-      await tx.reserva.update({
+    const actualizada = await prisma.$transaction(async (tx) => {
+      const resultado = await tx.reserva.updateMany({
         where: {
           id: reserva.id,
+          estado: "PENDIENTE_PAGO",
+          expiraEn: {
+            not: null,
+            lte: ahora,
+          },
         },
         data: {
           estado: "EXPIRADA",
         },
       });
 
+      if (resultado.count === 0) {
+        return false;
+      }
+
       if (
         reserva.pago &&
-        ["NO_GENERADO", "PENDIENTE"].includes(reserva.pago.estado)
+        ["NO_GENERADO", "PENDIENTE", "RECHAZADO"].includes(
+          reserva.pago.estado
+        )
       ) {
         await tx.pago.update({
           where: {
@@ -39,40 +81,61 @@ export async function expirarReservasPendientes() {
           },
         });
       }
+
+      return true;
     });
 
-    console.log(`⌛ Reserva expirada: ${reserva.codigo}`);
+    if (actualizada) {
+      cantidadExpirada++;
+      console.log(`⌛ Reserva expirada: ${reserva.codigo}`);
+    }
   }
 
-  return reservasVencidas.length;
+  return cantidadExpirada;
 }
 
 export async function procesarCheckoutsAutomaticos() {
-  const hoy = new Date();
+  const { fechaISO, hora } = obtenerFechaHoraHonduras();
+
+  if (hora < HORA_CHECKOUT) {
+    return 0;
+  }
+
+  const finDelDiaEnHonduras = new Date(
+    `${fechaISO}T23:59:59.999-06:00`
+  );
 
   const reservasParaCheckout = await prisma.reserva.findMany({
     where: {
-      estado: {
-        in: ["CONFIRMADA", "CHECK_IN"],
-      },
+      estado: "CHECK_IN",
       fechaSalida: {
-        lte: hoy,
+        lte: finDelDiaEnHonduras,
       },
+    },
+    select: {
+      id: true,
+      codigo: true,
     },
   });
 
+  let cantidadCheckout = 0;
+
   for (const reserva of reservasParaCheckout) {
-    await prisma.reserva.update({
+    const resultado = await prisma.reserva.updateMany({
       where: {
         id: reserva.id,
+        estado: "CHECK_IN",
       },
       data: {
         estado: "CHECK_OUT",
       },
     });
 
-    console.log(`🚪 Checkout automático: ${reserva.codigo}`);
+    if (resultado.count > 0) {
+      cantidadCheckout++;
+      console.log(`🚪 Checkout automático: ${reserva.codigo}`);
+    }
   }
 
-  return reservasParaCheckout.length;
+  return cantidadCheckout;
 }

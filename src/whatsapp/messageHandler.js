@@ -26,8 +26,10 @@ import {
   listarHabitacionesDisponiblesWalkIn,
   listarReservasParaCheckIn,
   listarReservasParaCheckout,
+  listarReservasParaCancelar,
   registrarCheckInPorHabitacion,
   registrarCheckoutPorHabitacion,
+  cancelarReservaPorId,
 } from "../reservas/service.js";
 
 const loggerDescarga = pino({ level: "silent" });
@@ -150,27 +152,24 @@ function formatearTelefono(telefono) {
   return sinPais;
 }
 
+function capacidadPorNumeroHabitacion(numero) {
+  const valor = String(numero);
+  if (["1", "2", "3"].includes(valor)) return 1;
+  if (["4", "5", "6"].includes(valor)) return 2;
+  if (["7", "8"].includes(valor)) return 3;
+  return null;
+}
+
 async function enviarMenuJefe(socket, jid) {
   await socket.sendMessage(jid, {
-    text: "🏨 MENÚ DEL JEFE\n\n" +
+    text:
+      "🏨 MENÚ DEL JEFE\n\n" +
       "1️⃣ Ocupar habitación\n" +
       "2️⃣ Check-in\n" +
       "3️⃣ Checkout\n" +
-      "4️⃣ Cambiar modo BOT/HUMANO\n\n" +
+      "4️⃣ Cambiar modo BOT/HUMANO\n" +
+      "5️⃣ Cancelar reserva\n\n" +
       "Responde con un número.",
-    sections: [
-      {
-        title: "Operaciones",
-        rows: [
-          { title: "Ocupar habitación", rowId: "jefe:menu:1", description: "Walk-in y efectivo" },
-          { title: "Check-in", rowId: "jefe:menu:2", description: "Elegir reserva confirmada" },
-          { title: "Checkout", rowId: "jefe:menu:3", description: "Elegir habitación ocupada" },
-          { title: "Cambiar modo BOT/HUMANO", rowId: "jefe:menu:4", description: "Ver conversaciones activas" },
-        ],
-      },
-    ],
-    listType: 1,
-    buttonText: "Abrir menú",
   });
 }
 
@@ -201,22 +200,33 @@ async function enviarConversacionesActivas(socket, jid) {
 
 async function enviarSeleccionHabitaciones(socket, jid, habitaciones, accion) {
   if (!habitaciones.length) {
-    await socket.sendMessage(jid, { text: "No hay habitaciones disponibles para esta operación." });
+    await socket.sendMessage(jid, { text: "No hay habitaciones para esta operación." });
     return;
   }
 
   await socket.sendMessage(jid, {
-    text: "Selecciona una habitación:",
-    sections: [{
-      title: "Habitaciones",
-      rows: habitaciones.map((habitacion) => ({
-        title: `Habitación ${habitacion.numero}`,
-        rowId: `jefe:room:${accion}:${habitacion.id}`,
-        description: `Capacidad: ${habitacion.capacidad}`,
-      })),
-    }],
-    listType: 1,
-    buttonText: "Elegir habitación",
+    text: "Selecciona una habitación escribiendo su número de la lista:\n\n" +
+      habitaciones.map((habitacion, indice) =>
+        `${indice + 1}. Habitación ${habitacion.numero} (${capacidadPorNumeroHabitacion(habitacion.numero) || habitacion.capacidad} personas)`
+      ).join("\n"),
+  });
+}
+
+async function enviarSeleccionReservasCancelar(socket, jid, reservas) {
+  if (!reservas.length) {
+    await socket.sendMessage(jid, {
+      text: "No hay reservas confirmadas pendientes de llegada.",
+    });
+    return;
+  }
+
+  await socket.sendMessage(jid, {
+    text:
+      "Selecciona la reserva que deseas cancelar:\n\n" +
+      reservas.map((reserva, indice) =>
+        `${indice + 1}. ${reserva.cliente.nombre} | Habitación ${reserva.habitacion.numero} | ${reserva.codigo}`
+      ).join("\n") +
+      "\n\nEl pago no será reembolsado.",
   });
 }
 
@@ -280,6 +290,64 @@ async function procesarFlujoJefe({ socket, jid, texto }) {
     return true;
   }
 
+  if ((flujo.tipo === "CHECKIN" || flujo.tipo === "CHECKOUT") && /^\d+$/.test(texto)) {
+    const indice = Number(texto) - 1;
+    const habitacion = flujo.habitaciones?.[indice];
+    if (!habitacion) {
+      await socket.sendMessage(jid, { text: "Número inválido. Elige uno de la lista." });
+      return true;
+    }
+
+    try {
+      const reserva = flujo.tipo === "CHECKIN"
+        ? await registrarCheckInPorHabitacion(habitacion.id)
+        : await registrarCheckoutPorHabitacion(habitacion.id);
+      const accion = flujo.tipo === "CHECKIN" ? "Check-in" : "Checkout";
+      await socket.sendMessage(jid, {
+        text: `✅ ${accion} realizado en habitación ${reserva.habitacion.numero}. Reserva ${reserva.codigo}.`,
+      });
+    } catch (error) {
+      await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
+    }
+    flujosJefe.delete(jid);
+    return true;
+  }
+
+  if (flujo.tipo === "CANCELAR" && /^\d+$/.test(texto)) {
+    const indice = Number(texto) - 1;
+    const seleccionada = flujo.reservas?.[indice];
+
+    if (!seleccionada) {
+      await socket.sendMessage(jid, {
+        text: "Número inválido. Elige una reserva de la lista.",
+      });
+      return true;
+    }
+
+    try {
+      const reserva = await cancelarReservaPorId(seleccionada.id);
+      await socket.sendMessage(jid, {
+        text:
+          `✅ Reserva ${reserva.codigo} cancelada.\n` +
+          `Habitación ${reserva.habitacion.numero} liberada para esas fechas.\n` +
+          "El pago permanece aprobado y no se realizará reembolso.",
+      });
+
+      if (reserva.cliente?.telefono) {
+        await socket.sendMessage(`${reserva.cliente.telefono}@s.whatsapp.net`, {
+          text:
+            `Tu reserva ${reserva.codigo} fue cancelada.\n` +
+            "De acuerdo con la política del hotel, los pagos de reservación no son reembolsables.",
+        });
+      }
+    } catch (error) {
+      await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
+    }
+
+    flujosJefe.delete(jid);
+    return true;
+  }
+
   if (flujo.tipo === "CHECKIN" && texto.startsWith("jefe:room:checkin:")) {
     try {
       const reserva = await registrarCheckInPorHabitacion(texto.split(":").pop());
@@ -314,17 +382,22 @@ async function procesarComandoPago({
 }) {
   try {
     if (accion === "aprobar") {
-      const { reserva } = await aprobarPagoPorCodigo(codigoPago);
+      const { reserva, reasignada } = await aprobarPagoPorCodigo(codigoPago);
 
       await socket.sendMessage(jid, {
-        text: `✅ Pago ${codigoPago} aprobado. Reserva ${reserva.codigo} confirmada.`,
+        text:
+          `✅ Pago ${codigoPago} aprobado. Reserva ${reserva.codigo} confirmada.\n` +
+          `Habitación: ${reserva.habitacion.numero}` +
+          (reasignada ? " (reasignada porque el comprobante llegó tarde)" : ""),
       });
 
       const telefonoCliente = reserva.cliente?.telefono;
 
       if (telefonoCliente) {
         await socket.sendMessage(`${telefonoCliente}@s.whatsapp.net`, {
-          text: `✅ ¡Tu pago fue confirmado! Tu reserva ${reserva.codigo} quedó confirmada. ¡Te esperamos! 🏨`,
+          text:
+            `✅ ¡Tu pago fue confirmado! Tu reserva ${reserva.codigo} quedó confirmada.\n` +
+            `Habitación: ${reserva.habitacion.numero}. ¡Te esperamos! 🏨`,
         });
       }
 
@@ -445,6 +518,8 @@ async function procesarComandoJefe({ socket, jid, texto }) {
     return;
   }
 
+  if (await procesarFlujoJefe({ socket, jid, texto: comandoOriginal })) return;
+
   if (["jefe:menu:1", "1"].includes(comando)) {
     flujosJefe.set(jid, { tipo: "OCUPAR_DATOS" });
     await socket.sendMessage(jid, {
@@ -455,15 +530,17 @@ async function procesarComandoJefe({ socket, jid, texto }) {
 
   if (["jefe:menu:2", "2"].includes(comando)) {
     const reservas = await listarReservasParaCheckIn();
-    flujosJefe.set(jid, { tipo: "CHECKIN" });
-    await enviarSeleccionHabitaciones(socket, jid, reservas.map((reserva) => reserva.habitacion), "checkin");
+    const habitaciones = reservas.map((reserva) => reserva.habitacion);
+    flujosJefe.set(jid, { tipo: "CHECKIN", habitaciones });
+    await enviarSeleccionHabitaciones(socket, jid, habitaciones, "checkin");
     return;
   }
 
   if (["jefe:menu:3", "3"].includes(comando)) {
     const reservas = await listarReservasParaCheckout();
-    flujosJefe.set(jid, { tipo: "CHECKOUT" });
-    await enviarSeleccionHabitaciones(socket, jid, reservas.map((reserva) => reserva.habitacion), "checkout");
+    const habitaciones = reservas.map((reserva) => reserva.habitacion);
+    flujosJefe.set(jid, { tipo: "CHECKOUT", habitaciones });
+    await enviarSeleccionHabitaciones(socket, jid, habitaciones, "checkout");
     return;
   }
 
@@ -472,7 +549,12 @@ async function procesarComandoJefe({ socket, jid, texto }) {
     return;
   }
 
-  if (await procesarFlujoJefe({ socket, jid, texto: comandoOriginal })) return;
+  if (["jefe:menu:5", "5"].includes(comando)) {
+    const reservas = await listarReservasParaCancelar();
+    flujosJefe.set(jid, { tipo: "CANCELAR", reservas });
+    await enviarSeleccionReservasCancelar(socket, jid, reservas);
+    return;
+  }
 
   const coincidenciaPago = comandoOriginal.match(/^\/(p\d+)\s+(aprobar|rechazar)(?:\s+(.+))?$/i);
   if (coincidenciaPago) {
