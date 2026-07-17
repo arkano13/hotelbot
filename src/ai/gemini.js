@@ -253,3 +253,34 @@ REGLAS GENERALES:
 
   throw new Error("Gemini superó el máximo de rondas de herramientas");
 }
+
+export async function transcribirAudio(buffer, mimetype) {
+  const response = await generarConReintentos({
+    model: MODEL,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              mimeType: mimetype,
+              data: buffer.toString("base64"),
+            },
+          },
+          {
+            text:
+              "Transcribe este audio de WhatsApp a texto en español. " +
+              "Responde únicamente con la transcripción, sin comentarios ni explicaciones adicionales. " +
+              "Si no se entiende nada, responde solamente con: [audio no entendido]",
+          },
+        ],
+      },
+    ],
+    config: {
+      temperature: 0,
+      maxOutputTokens: 300,
+    },
+  });
+
+  return response.text?.trim() || "[audio no entendido]";
+}

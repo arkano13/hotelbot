@@ -12,7 +12,7 @@ import {
 } from "../conversations/service.js";
 
 import { guardarMensaje } from "../messages/service.js";
-import { generarRespuestaGemini } from "../ai/gemini.js";
+import { generarRespuestaGemini, transcribirAudio } from "../ai/gemini.js";
 
 import {
   aprobarPagoPorCodigo,
@@ -768,6 +768,23 @@ async function procesarComprobante({
   }
 }
 
+async function transcribirNotaDeVoz(message, socket) {
+  const buffer = await downloadMediaMessage(
+    message,
+    "buffer",
+    {},
+    {
+      logger: loggerDescarga,
+      reuploadRequest: socket.updateMediaMessage,
+    }
+  );
+
+  const mimetype =
+    message.message?.audioMessage?.mimetype ?? "audio/ogg";
+
+  return transcribirAudio(buffer, mimetype);
+}
+
 async function procesarMensajesAgrupados({
   socket,
   jid,
@@ -954,8 +971,38 @@ export async function manejarMensajeEntrante({
     return;
   }
 
-  const texto =
-    obtenerTextoMensaje(message);
+  const esAudio = Boolean(
+    message.message?.audioMessage
+  );
+
+  let texto;
+
+  if (esAudio) {
+    try {
+      texto = await transcribirNotaDeVoz(message, socket);
+    } catch (error) {
+      console.error(
+        "❌ Error transcribiendo audio:",
+        error
+      );
+
+      await socket.sendMessage(jid, {
+        text: "Tuve un problema al escuchar tu audio. ¿Puedes escribirlo o intentar enviarlo de nuevo?",
+      });
+
+      return;
+    }
+
+    if (texto === "[audio no entendido]") {
+      await socket.sendMessage(jid, {
+        text: "No logré entender tu audio 😅 ¿Puedes repetirlo o escribirlo?",
+      });
+
+      return;
+    }
+  } else {
+    texto = obtenerTextoMensaje(message);
+  }
 
   if (!texto) {
     return;
