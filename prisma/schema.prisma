@@ -157,6 +157,7 @@ model Pago {
 
 model ImagenHabitacion {
   id          String   @id @default(uuid())
+  tipo        String   @default("HABITACION")
   url         String
   descripcion String?
   orden       Int      @default(0)
@@ -235,3 +236,4 @@ model Auditoria {
   @@index([createdAt])
   @@map("auditoria")
 }
+

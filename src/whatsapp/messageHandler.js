@@ -62,7 +62,7 @@ function formatearHistorial(conversacion) {
   });
 
   const encabezado = `📜 Historial de ${conversacion.codigo} (${formatearTelefono(
-    conversacion.telefono
+    conversacion.telefono,
   )})\n\n`;
 
   return encabezado + lineas.join("\n");
@@ -74,7 +74,7 @@ const TIEMPO_ESPERA = 3000;
 const mensajesProcesados = new Map();
 const TIEMPO_RETENCION_IDS = 10 * 60 * 1000;
 
-const flujosJefe = new Map();
+import { flujosJefe } from "../lib/flujosJefe.js";
 
 function yaFueProcesado(messageId) {
   if (!messageId) {
@@ -93,17 +93,12 @@ function yaFueProcesado(messageId) {
     return true;
   }
 
-  mensajesProcesados.set(
-    messageId,
-    ahora + TIEMPO_RETENCION_IDS
-  );
+  mensajesProcesados.set(messageId, ahora + TIEMPO_RETENCION_IDS);
 
   return false;
 }
 
-const OWNER_PHONE = String(
-  process.env.OWNER_PHONE ?? ""
-)
+const OWNER_PHONE = String(process.env.OWNER_PHONE ?? "")
   .replace(/\D/g, "")
   .trim();
 
@@ -116,15 +111,11 @@ function limpiarJid(jid) {
 }
 
 function obtenerTelefonoMensaje(message) {
-  const jidAlternativo =
-    message.key?.remoteJidAlt;
+  const jidAlternativo = message.key?.remoteJidAlt;
 
-  const jidPrincipal =
-    message.key?.remoteJid;
+  const jidPrincipal = message.key?.remoteJid;
 
-  return limpiarJid(
-    jidAlternativo || jidPrincipal
-  );
+  return limpiarJid(jidAlternativo || jidPrincipal);
 }
 
 function obtenerTextoMensaje(message) {
@@ -140,12 +131,9 @@ function obtenerTextoMensaje(message) {
 }
 
 function formatearTelefono(telefono) {
-  const numero = String(telefono ?? "")
-    .replace(/\D/g, "");
+  const numero = String(telefono ?? "").replace(/\D/g, "");
 
-  const sinPais = numero.startsWith("504")
-    ? numero.slice(3)
-    : numero;
+  const sinPais = numero.startsWith("504") ? numero.slice(3) : numero;
 
   if (sinPais.length === 8) {
     return `${sinPais.slice(0, 4)}-${sinPais.slice(4)}`;
@@ -179,7 +167,7 @@ async function enviarMenuJefe(socket, jid) {
 async function enviarConversacionesActivas(socket, jid) {
   const conversaciones = await listarConversacionesActivas();
   const conversacionesClientes = conversaciones.filter(
-    (conversacion) => conversacion.telefono !== OWNER_PHONE
+    (conversacion) => conversacion.telefono !== OWNER_PHONE,
   );
 
   if (!conversacionesClientes.length) {
@@ -195,7 +183,8 @@ async function enviarConversacionesActivas(socket, jid) {
   });
 
   await socket.sendMessage(jid, {
-    text: "💬 Conversaciones activas\n\n" +
+    text:
+      "💬 Conversaciones activas\n\n" +
       filas.join("\n") +
       "\n\nUsa:\n/C1234 humano\n/C1234 bot\n/C1234 historial",
   });
@@ -203,15 +192,21 @@ async function enviarConversacionesActivas(socket, jid) {
 
 async function enviarSeleccionHabitaciones(socket, jid, habitaciones, accion) {
   if (!habitaciones.length) {
-    await socket.sendMessage(jid, { text: "No hay habitaciones para esta operación." });
+    await socket.sendMessage(jid, {
+      text: "No hay habitaciones para esta operación.",
+    });
     return;
   }
 
   await socket.sendMessage(jid, {
-    text: "Selecciona una habitación escribiendo su número de la lista:\n\n" +
-      habitaciones.map((habitacion, indice) =>
-        `${indice + 1}. Habitación ${habitacion.numero} (${capacidadPorNumeroHabitacion(habitacion.numero) || habitacion.capacidad} personas)`
-      ).join("\n"),
+    text:
+      "Selecciona una habitación escribiendo su número de la lista:\n\n" +
+      habitaciones
+        .map(
+          (habitacion, indice) =>
+            `${indice + 1}. Habitación ${habitacion.numero} (${capacidadPorNumeroHabitacion(habitacion.numero) || habitacion.capacidad} personas)`,
+        )
+        .join("\n"),
   });
 }
 
@@ -226,9 +221,12 @@ async function enviarSeleccionReservasCancelar(socket, jid, reservas) {
   await socket.sendMessage(jid, {
     text:
       "Selecciona la reserva que deseas cancelar:\n\n" +
-      reservas.map((reserva, indice) =>
-        `${indice + 1}. ${reserva.cliente.nombre} | Habitación ${reserva.habitacion.numero} | ${reserva.codigo}`
-      ).join("\n") +
+      reservas
+        .map(
+          (reserva, indice) =>
+            `${indice + 1}. ${reserva.cliente.nombre} | Habitación ${reserva.habitacion.numero} | ${reserva.codigo}`,
+        )
+        .join("\n") +
       "\n\nEl pago no será reembolsado.",
   });
 }
@@ -242,17 +240,22 @@ async function enviarSeleccionMantenimiento(socket, jid, habitaciones) {
   await socket.sendMessage(jid, {
     text:
       "Selecciona la habitación que quieres habilitar o deshabilitar:\n\n" +
-      habitaciones.map((habitacion, indice) => {
-        const estadoTexto =
-          habitacion.estado === "MANTENIMIENTO" ? "🔧 en mantenimiento" : "✅ disponible";
-        return `${indice + 1}. Habitación ${habitacion.numero} (${estadoTexto})`;
-      }).join("\n"),
+      habitaciones
+        .map((habitacion, indice) => {
+          const estadoTexto =
+            habitacion.estado === "MANTENIMIENTO"
+              ? "🔧 en mantenimiento"
+              : "✅ disponible";
+          return `${indice + 1}. Habitación ${habitacion.numero} (${estadoTexto})`;
+        })
+        .join("\n"),
   });
 }
 
 async function procesarFlujoJefe({ socket, jid, texto }) {
   const textoNormalizado = texto.toLowerCase();
-  if (textoNormalizado === "/menu" || textoNormalizado.startsWith("jefe:menu:")) return false;
+  if (textoNormalizado === "/menu" || textoNormalizado.startsWith("jefe:menu:"))
+    return false;
 
   const flujo = flujosJefe.get(jid);
   if (!flujo) return false;
@@ -260,16 +263,25 @@ async function procesarFlujoJefe({ socket, jid, texto }) {
   if (flujo.tipo === "OCUPAR_DATOS") {
     const partes = texto.split("|").map((parte) => parte.trim());
     if (partes.length < 3) {
-      await socket.sendMessage(jid, { text: "Formato: Nombre | personas | noches\nEjemplo: Juan Pérez | 1 | 2" });
+      await socket.sendMessage(jid, {
+        text: "Formato: Nombre | personas | noches\nEjemplo: Juan Pérez | 1 | 2",
+      });
       return true;
     }
 
     const [nombre, personasTexto, nochesTexto] = partes;
     const personas = Number(personasTexto);
     const noches = Number(nochesTexto);
-    if (!nombre || !Number.isInteger(personas) || personas < 1 ||
-        !Number.isInteger(noches) || noches < 1) {
-      await socket.sendMessage(jid, { text: "Datos inválidos. Ejemplo: Juan Pérez | 1 | 2" });
+    if (
+      !nombre ||
+      !Number.isInteger(personas) ||
+      personas < 1 ||
+      !Number.isInteger(noches) ||
+      noches < 1
+    ) {
+      await socket.sendMessage(jid, {
+        text: "Datos inválidos. Ejemplo: Juan Pérez | 1 | 2",
+      });
       return true;
     }
 
@@ -293,18 +305,24 @@ async function procesarFlujoJefe({ socket, jid, texto }) {
     return true;
   }
 
-  if ((flujo.tipo === "CHECKIN" || flujo.tipo === "CHECKOUT") && /^\d+$/.test(texto)) {
+  if (
+    (flujo.tipo === "CHECKIN" || flujo.tipo === "CHECKOUT") &&
+    /^\d+$/.test(texto)
+  ) {
     const indice = Number(texto) - 1;
     const habitacion = flujo.habitaciones?.[indice];
     if (!habitacion) {
-      await socket.sendMessage(jid, { text: "Número inválido. Elige uno de la lista." });
+      await socket.sendMessage(jid, {
+        text: "Número inválido. Elige uno de la lista.",
+      });
       return true;
     }
 
     try {
-      const reserva = flujo.tipo === "CHECKIN"
-        ? await registrarCheckInPorHabitacion(habitacion.id)
-        : await registrarCheckoutPorHabitacion(habitacion.id);
+      const reserva =
+        flujo.tipo === "CHECKIN"
+          ? await registrarCheckInPorHabitacion(habitacion.id)
+          : await registrarCheckoutPorHabitacion(habitacion.id);
       const accion = flujo.tipo === "CHECKIN" ? "Check-in" : "Checkout";
       await socket.sendMessage(jid, {
         text: `✅ ${accion} realizado en habitación ${reserva.habitacion.numero}. Reserva ${reserva.codigo}.`,
@@ -380,8 +398,12 @@ async function procesarFlujoJefe({ socket, jid, texto }) {
 
   if (flujo.tipo === "CHECKIN" && texto.startsWith("jefe:room:checkin:")) {
     try {
-      const reserva = await registrarCheckInPorHabitacion(texto.split(":").pop());
-      await socket.sendMessage(jid, { text: `✅ Check-in realizado en habitación ${reserva.habitacion.numero}. Reserva ${reserva.codigo}.` });
+      const reserva = await registrarCheckInPorHabitacion(
+        texto.split(":").pop(),
+      );
+      await socket.sendMessage(jid, {
+        text: `✅ Check-in realizado en habitación ${reserva.habitacion.numero}. Reserva ${reserva.codigo}.`,
+      });
     } catch (error) {
       await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
     }
@@ -391,12 +413,52 @@ async function procesarFlujoJefe({ socket, jid, texto }) {
 
   if (flujo.tipo === "CHECKOUT" && texto.startsWith("jefe:room:checkout:")) {
     try {
-      const reserva = await registrarCheckoutPorHabitacion(texto.split(":").pop());
-      await socket.sendMessage(jid, { text: `✅ Checkout realizado en habitación ${reserva.habitacion.numero}. Reserva ${reserva.codigo}.` });
+      const reserva = await registrarCheckoutPorHabitacion(
+        texto.split(":").pop(),
+      );
+      await socket.sendMessage(jid, {
+        text: `✅ Checkout realizado en habitación ${reserva.habitacion.numero}. Reserva ${reserva.codigo}.`,
+      });
     } catch (error) {
       await socket.sendMessage(jid, { text: `⚠️ ${error.message}` });
     }
     flujosJefe.delete(jid);
+    return true;
+  }
+
+  if (flujo.tipo === "ESCALAR_CONFIRMACION") {
+    const opcion = texto.trim().toLowerCase();
+
+    if (["1", "aceptar"].includes(opcion)) {
+      try {
+        await cambiarModoConversacion(flujo.conversationId, "HUMANO");
+
+        await socket.sendMessage(jid, {
+          text: "✅ Tomaste la conversación. El bot dejó de responder ahí, ya puedes escribirle directo al cliente.",
+        });
+      } catch (error) {
+        await socket.sendMessage(jid, {
+          text: `⚠️ ${error.message}`,
+        });
+      }
+
+      flujosJefe.delete(jid);
+      return true;
+    }
+
+    if (["2", "rechazar"].includes(opcion)) {
+      await socket.sendMessage(jid, {
+        text: "❌ Está bien, el bot sigue atendiendo esa conversación.",
+      });
+
+      flujosJefe.delete(jid);
+      return true;
+    }
+
+    await socket.sendMessage(jid, {
+      text: "Responde 1 para aceptar o 2 para rechazar.",
+    });
+
     return true;
   }
 
@@ -435,10 +497,7 @@ async function procesarComandoPago({
     }
 
     if (accion === "rechazar") {
-      const pagoActualizado = await rechazarPagoPorCodigo(
-        codigoPago,
-        motivo
-      );
+      const pagoActualizado = await rechazarPagoPorCodigo(codigoPago, motivo);
 
       await socket.sendMessage(jid, {
         text: `❌ Pago ${codigoPago} rechazado.`,
@@ -496,7 +555,7 @@ async function procesarComandoOcupar({
         `✅ Reserva registrada — ${reserva.codigo}\n` +
         `Cliente: ${nombre} (${formatearTelefono(telefonoCliente)})\n` +
         `Fechas: ${formatearFechaCorta(fechaEntrada)} → ${formatearFechaCorta(
-          fechaSalida
+          fechaSalida,
         )}\n` +
         `Personas: ${personas} | Noches: ${noches}\n` +
         `Total: L. ${Number(reserva.precioTotal).toFixed(2)} (efectivo, ya confirmado)`,
@@ -507,7 +566,7 @@ async function procesarComandoOcupar({
         `✅ ¡Bienvenido! Tu reserva quedó confirmada.\n` +
         `Código: ${reserva.codigo}\n` +
         `Fechas: ${formatearFechaCorta(fechaEntrada)} → ${formatearFechaCorta(
-          fechaSalida
+          fechaSalida,
         )}\n` +
         `Total: L. ${Number(reserva.precioTotal).toFixed(2)} (efectivo)`,
     });
@@ -518,11 +577,7 @@ async function procesarComandoOcupar({
   }
 }
 
-async function procesarComandoLiberar({
-  socket,
-  jid,
-  codigoReserva,
-}) {
+async function procesarComandoLiberar({ socket, jid, codigoReserva }) {
   try {
     const reserva = await liberarReservaPorCodigo(codigoReserva);
 
@@ -593,10 +648,13 @@ async function procesarComandoJefe({ socket, jid, texto }) {
     return;
   }
 
-  const coincidenciaPago = comandoOriginal.match(/^\/(p\d+)\s+(aprobar|rechazar)(?:\s+(.+))?$/i);
+  const coincidenciaPago = comandoOriginal.match(
+    /^\/(p\d+)\s+(aprobar|rechazar)(?:\s+(.+))?$/i,
+  );
   if (coincidenciaPago) {
     await procesarComandoPago({
-      socket, jid,
+      socket,
+      jid,
       codigoPago: coincidenciaPago[1].toUpperCase(),
       accion: coincidenciaPago[2].toLowerCase(),
       motivo: coincidenciaPago[3]?.trim(),
@@ -604,10 +662,13 @@ async function procesarComandoJefe({ socket, jid, texto }) {
     return;
   }
 
-  const coincidenciaOcupar = comandoOriginal.match(/^\/ocupar\s+(\d{8,})\s+(\d+)\s+(\d+)\s+(.+)$/i);
+  const coincidenciaOcupar = comandoOriginal.match(
+    /^\/ocupar\s+(\d{8,})\s+(\d+)\s+(\d+)\s+(.+)$/i,
+  );
   if (coincidenciaOcupar) {
     await procesarComandoOcupar({
-      socket, jid,
+      socket,
+      jid,
       telefonoCliente: coincidenciaOcupar[1].replace(/\D/g, ""),
       personas: Number(coincidenciaOcupar[2]),
       noches: Number(coincidenciaOcupar[3]),
@@ -616,15 +677,23 @@ async function procesarComandoJefe({ socket, jid, texto }) {
     return;
   }
 
-  const coincidenciaLiberar = comandoOriginal.match(/^\/(res-\d{4}-\d+)\s+liberar$/i);
+  const coincidenciaLiberar = comandoOriginal.match(
+    /^\/(res-\d{4}-\d+)\s+liberar$/i,
+  );
   if (coincidenciaLiberar) {
-    await procesarComandoLiberar({ socket, jid, codigoReserva: coincidenciaLiberar[1] });
+    await procesarComandoLiberar({
+      socket,
+      jid,
+      codigoReserva: coincidenciaLiberar[1],
+    });
     return;
   }
 
   const coincidencia = comando.match(/^\/(c\d+)\s+(humano|bot|historial)$/i);
   if (!coincidencia) {
-    await socket.sendMessage(jid, { text: "Escribe /menu para abrir el menú del jefe." });
+    await socket.sendMessage(jid, {
+      text: "Escribe /menu para abrir el menú del jefe.",
+    });
     return;
   }
 
@@ -634,12 +703,17 @@ async function procesarComandoJefe({ socket, jid, texto }) {
   try {
     conversacion = await obtenerConversacionPorCodigo(codigo);
   } catch {
-    await socket.sendMessage(jid, { text: `No encontré la conversación ${codigo}. Escribe /menu.` });
+    await socket.sendMessage(jid, {
+      text: `No encontré la conversación ${codigo}. Escribe /menu.`,
+    });
     return;
   }
 
   if (accion === "historial") {
-    const historial = await obtenerConversacionConHistorial(conversacion.telefono, 100);
+    const historial = await obtenerConversacionConHistorial(
+      conversacion.telefono,
+      100,
+    );
     await socket.sendMessage(jid, { text: formatearHistorial(historial) });
     return;
   }
@@ -647,9 +721,10 @@ async function procesarComandoJefe({ socket, jid, texto }) {
   const modo = accion === "humano" ? "HUMANO" : "BOT";
   await cambiarModoConversacion(conversacion.id, modo);
   await socket.sendMessage(jid, {
-    text: modo === "HUMANO"
-      ? `✅ ${codigo} ahora está en modo HUMANO.`
-      : `✅ ${codigo} volvió al modo BOT.`,
+    text:
+      modo === "HUMANO"
+        ? `✅ ${codigo} ahora está en modo HUMANO.`
+        : `✅ ${codigo} volvió al modo BOT.`,
   });
 }
 
@@ -678,12 +753,7 @@ function formatearFechaCorta(fecha) {
   });
 }
 
-async function procesarComprobante({
-  socket,
-  jid,
-  telefono,
-  message,
-}) {
+async function procesarComprobante({ socket, jid, telefono, message }) {
   const conversacion = await obtenerOCrearConversacion(telefono);
 
   const reservaId = conversacion.reservaId;
@@ -703,11 +773,10 @@ async function procesarComprobante({
     {
       logger: loggerDescarga,
       reuploadRequest: socket.updateMediaMessage,
-    }
+    },
   );
 
-  const mimetype =
-    message.message?.imageMessage?.mimetype ?? "image/jpeg";
+  const mimetype = message.message?.imageMessage?.mimetype ?? "image/jpeg";
 
   const extension = mimetype.includes("png") ? "png" : "jpg";
 
@@ -722,8 +791,7 @@ async function procesarComprobante({
   await fs.promises.writeFile(rutaArchivo, buffer);
 
   const baseUrl =
-    process.env.BASE_URL ||
-    `http://localhost:${process.env.PORT || 3000}`;
+    process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
 
   const comprobanteUrl = `${baseUrl}/uploads/comprobantes/${nombreArchivo}`;
 
@@ -757,10 +825,10 @@ async function procesarComprobante({
           conversacion.codigo
         }\n` +
         `Cliente: ${cliente?.nombre ?? "N/A"} (${formatearTelefono(
-          telefono
+          telefono,
         )})\n` +
         `Fechas: ${formatearFechaCorta(
-          reserva?.fechaEntrada
+          reserva?.fechaEntrada,
         )} → ${formatearFechaCorta(reserva?.fechaSalida)}\n` +
         `Monto esperado: L. ${Number(pago.monto).toFixed(2)}\n\n` +
         `Responde:\n/${pago.codigo} aprobar\n/${pago.codigo} rechazar [motivo]`,
@@ -776,37 +844,24 @@ async function transcribirNotaDeVoz(message, socket) {
     {
       logger: loggerDescarga,
       reuploadRequest: socket.updateMediaMessage,
-    }
+    },
   );
 
-  const mimetype =
-    message.message?.audioMessage?.mimetype ?? "audio/ogg";
+  const mimetype = message.message?.audioMessage?.mimetype ?? "audio/ogg";
 
   return transcribirAudio(buffer, mimetype);
 }
 
-async function procesarMensajesAgrupados({
-  socket,
-  jid,
-  telefono,
-  textos,
-}) {
-  const textoCompleto = textos
-    .join(" ")
-    .trim();
+async function procesarMensajesAgrupados({ socket, jid, telefono, textos }) {
+  const textoCompleto = textos.join(" ").trim();
 
   if (!textoCompleto) {
     return;
   }
 
-  console.log(
-    `📩 ${telefono}: ${textoCompleto}`
-  );
+  console.log(`📩 ${telefono}: ${textoCompleto}`);
 
-  const conversacion =
-    await obtenerOCrearConversacion(
-      telefono
-    );
+  const conversacion = await obtenerOCrearConversacion(telefono);
 
   await guardarMensaje({
     conversationId: conversacion.id,
@@ -814,68 +869,48 @@ async function procesarMensajesAgrupados({
     content: textoCompleto,
   });
 
-  if (
-    conversacion.mode === "HUMANO"
-  ) {
-    console.log(
-      `👤 Conversación ${conversacion.codigo} está en modo HUMANO`
-    );
+  if (conversacion.mode === "HUMANO") {
+    console.log(`👤 Conversación ${conversacion.codigo} está en modo HUMANO`);
 
     return;
   }
 
-  const conversacionConHistorial =
-    await obtenerConversacionConHistorial(
-      telefono,
-      15
-    );
+  const conversacionConHistorial = await obtenerConversacionConHistorial(
+    telefono,
+    15,
+  );
 
   let respuesta;
 
   try {
-    respuesta =
-      await generarRespuestaGemini({
-        messages:
-          conversacionConHistorial
-            ?.messages ?? [],
+    respuesta = await generarRespuestaGemini({
+      messages: conversacionConHistorial?.messages ?? [],
 
-        step:
-          conversacionConHistorial
-            ?.step ??
-          conversacion.step,
+      step: conversacionConHistorial?.step ?? conversacion.step,
 
-        telefono,
+      telefono,
 
-        conversationId:
-          conversacion.id,
+      conversationId: conversacion.id,
 
-        socket,
-        jid,
-      });
+      socket,
+      jid,
+    });
   } catch (error) {
-    console.error(
-      "❌ Error generando respuesta con Gemini:",
-      error
-    );
+    console.error("❌ Error generando respuesta con Gemini:", error);
 
     if (error?.status === 429) {
       respuesta =
         "El asistente está temporalmente ocupado. Intenta nuevamente más tarde.";
-    } else if (
-      error?.status === 503 ||
-      error?.status === 504
-    ) {
+    } else if (error?.status === 503 || error?.status === 504) {
       respuesta =
         "El asistente está ocupado. Intenta nuevamente en unos momentos.";
     } else {
-      respuesta =
-        "Disculpa, tuve un problema al procesar tu mensaje.";
+      respuesta = "Disculpa, tuve un problema al procesar tu mensaje.";
     }
   }
 
   if (!respuesta?.trim()) {
-    respuesta =
-      "Disculpa, no pude procesar tu mensaje.";
+    respuesta = "Disculpa, no pude procesar tu mensaje.";
   }
 
   await socket.sendMessage(jid, {
@@ -888,48 +923,29 @@ async function procesarMensajesAgrupados({
     content: respuesta,
   });
 
-  console.log(
-    `🤖 ${conversacion.codigo}: ${respuesta}`
-  );
+  console.log(`🤖 ${conversacion.codigo}: ${respuesta}`);
 }
 
-export async function manejarMensajeEntrante({
-  socket,
-  message,
-}) {
-  if (
-    !message?.message ||
-    message.key?.fromMe
-  ) {
+export async function manejarMensajeEntrante({ socket, message }) {
+  if (!message?.message || message.key?.fromMe) {
     return;
   }
 
   if (yaFueProcesado(message.key?.id)) {
-    console.log(
-      `🔁 Mensaje duplicado ignorado: ${message.key?.id}`
-    );
+    console.log(`🔁 Mensaje duplicado ignorado: ${message.key?.id}`);
 
     return;
   }
 
-  const jid =
-    message.key?.remoteJid;
+  const jid = message.key?.remoteJid;
 
-  if (
-    !jid ||
-    jid === "status@broadcast" ||
-    jid.endsWith("@g.us")
-  ) {
+  if (!jid || jid === "status@broadcast" || jid.endsWith("@g.us")) {
     return;
   }
 
-  const telefono =
-    obtenerTelefonoMensaje(message);
+  const telefono = obtenerTelefonoMensaje(message);
 
-  if (
-    OWNER_PHONE &&
-    telefono === OWNER_PHONE
-  ) {
+  if (OWNER_PHONE && telefono === OWNER_PHONE) {
     const texto = obtenerTextoMensaje(message);
 
     if (!texto) {
@@ -945,9 +961,7 @@ export async function manejarMensajeEntrante({
     return;
   }
 
-  const esImagen = Boolean(
-    message.message?.imageMessage
-  );
+  const esImagen = Boolean(message.message?.imageMessage);
 
   if (esImagen) {
     try {
@@ -958,10 +972,7 @@ export async function manejarMensajeEntrante({
         message,
       });
     } catch (error) {
-      console.error(
-        "❌ Error procesando comprobante:",
-        error
-      );
+      console.error("❌ Error procesando comprobante:", error);
 
       await socket.sendMessage(jid, {
         text: "Tuve un problema al recibir la imagen. ¿Puedes intentar enviarla de nuevo?",
@@ -971,20 +982,29 @@ export async function manejarMensajeEntrante({
     return;
   }
 
-  const esAudio = Boolean(
-    message.message?.audioMessage
-  );
+  const esAudio = Boolean(message.message?.audioMessage);
 
   let texto;
 
   if (esAudio) {
+    const duracion = Number(message.message?.audioMessage?.seconds || 0);
+
+    const maximoSegundos = Number(process.env.MAX_AUDIO_SECONDS || 180);
+
+    if (duracion > maximoSegundos) {
+      await socket.sendMessage(jid, {
+        text: `El audio es demasiado largo. Envíame uno de máximo ${Math.floor(
+          maximoSegundos / 60,
+        )} minutos o escribe el mensaje.`,
+      });
+
+      return;
+    }
+
     try {
       texto = await transcribirNotaDeVoz(message, socket);
     } catch (error) {
-      console.error(
-        "❌ Error transcribiendo audio:",
-        error
-      );
+      console.error("❌ Error transcribiendo audio:", error);
 
       await socket.sendMessage(jid, {
         text: "Tuve un problema al escuchar tu audio. ¿Puedes escribirlo o intentar enviarlo de nuevo?",
@@ -1008,50 +1028,37 @@ export async function manejarMensajeEntrante({
     return;
   }
 
-  const pendiente =
-    mensajesPendientes.get(jid) ?? {
-      textos: [],
-      timeout: null,
-    };
+  const pendiente = mensajesPendientes.get(jid) ?? {
+    textos: [],
+    timeout: null,
+  };
 
   pendiente.textos.push(texto);
 
   if (pendiente.timeout) {
-    clearTimeout(
-      pendiente.timeout
-    );
+    clearTimeout(pendiente.timeout);
   }
 
-  pendiente.timeout = setTimeout(
-    async () => {
-      const datos =
-        mensajesPendientes.get(jid);
+  pendiente.timeout = setTimeout(async () => {
+    const datos = mensajesPendientes.get(jid);
 
-      mensajesPendientes.delete(jid);
+    mensajesPendientes.delete(jid);
 
-      if (!datos) {
-        return;
-      }
+    if (!datos) {
+      return;
+    }
 
-      try {
-        await procesarMensajesAgrupados({
-          socket,
-          jid,
-          telefono,
-          textos: datos.textos,
-        });
-      } catch (error) {
-        console.error(
-          "❌ Error procesando mensajes:",
-          error
-        );
-      }
-    },
-    TIEMPO_ESPERA
-  );
+    try {
+      await procesarMensajesAgrupados({
+        socket,
+        jid,
+        telefono,
+        textos: datos.textos,
+      });
+    } catch (error) {
+      console.error("❌ Error procesando mensajes:", error);
+    }
+  }, TIEMPO_ESPERA);
 
-  mensajesPendientes.set(
-    jid,
-    pendiente
-  );
+  mensajesPendientes.set(jid, pendiente);
 }

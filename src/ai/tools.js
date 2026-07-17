@@ -67,10 +67,16 @@ export const hotelTools = [
       {
         name: "enviar_fotos",
         description:
-          "Envía las fotografías de las habitaciones únicamente cuando el cliente las solicita.",
+          "Envía fotografías al cliente únicamente cuando las solicita. Usa tipo 'habitacion' para fotos de los cuartos, o 'general' para fotos del hotel en general (fachada, recepción, áreas comunes).",
         parameters: {
           type: "OBJECT",
-          properties: {},
+          properties: {
+            tipo: {
+              type: "STRING",
+              description:
+                "'habitacion' o 'general'. Si el cliente no especifica, usa 'habitacion'.",
+            },
+          },
         },
       },
       {
@@ -132,6 +138,22 @@ export const hotelTools = [
         parameters: {
           type: "OBJECT",
           properties: {},
+        },
+      },
+      {
+        name: "escalar_a_humano",
+        description:
+          "Notifica al jefe para que decida si toma el control de la conversación. Úsala cuando: el cliente pida explícitamente hablar con una persona, el cliente esté siendo grosero/irrespetuoso, o la situación se salga de lo que puedes resolver tú (quejas, negociaciones, casos fuera de lo normal). No cambias el modo tú solo — el jefe decide si acepta o rechaza.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            motivo: {
+              type: "STRING",
+              description:
+                "Resume en una frase breve por qué se necesita escalar, para que el jefe entienda la situación de un vistazo.",
+            },
+          },
+          required: ["motivo"],
         },
       },
       {

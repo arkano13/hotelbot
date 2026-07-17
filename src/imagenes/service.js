@@ -1,19 +1,21 @@
 import { prisma } from "../lib/prisma.js";
 
-export async function obtenerImagenesHabitacion() {
-  const imagenes =
-    await prisma.imagenHabitacion.findMany({
-      where: {
-        activa: true,
-      },
-      orderBy: {
-        orden: "asc",
-      },
-    });
+export async function obtenerImagenesHabitacion(tipo = "HABITACION") {
+  const imagenes = await prisma.imagenHabitacion.findMany({
+    where: {
+      activa: true,
+      tipo,
+    },
+    orderBy: {
+      orden: "asc",
+    },
+  });
 
   if (imagenes.length === 0) {
     throw new Error(
-      "No hay fotografías disponibles"
+      tipo === "GENERAL"
+        ? "No hay fotos generales del hotel disponibles todavía"
+        : "No hay fotografías de habitaciones disponibles todavía"
     );
   }
 
