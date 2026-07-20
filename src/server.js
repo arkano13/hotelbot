@@ -1,5 +1,13 @@
 import "dotenv/config";
 
+const advertenciaOriginal = console.warn;
+console.warn = (...args) => {
+  if (args[0] === "Decrypted message with closed session.") {
+    return;
+  }
+  advertenciaOriginal(...args);
+};
+
 import { app } from "./app.js";
 import { prisma } from "./lib/prisma.js";
 import { iniciarWhatsApp } from "./whatsapp/client.js";
