@@ -24,20 +24,29 @@ async function crearTarifas() {
 }
 
 async function crearHabitaciones() {
-  const habitaciones = ["1", "2", "3", "4", "5", "6", "7", "8"];
+  const habitaciones = [
+    { numero: "1", capacidad: 1 },
+    { numero: "2", capacidad: 1 },
+    { numero: "3", capacidad: 1 },
+    { numero: "4", capacidad: 2 },
+    { numero: "5", capacidad: 2 },
+    { numero: "6", capacidad: 2 },
+    { numero: "7", capacidad: 3 },
+    { numero: "8", capacidad: 3 },
+  ];
 
-  for (const numero of habitaciones) {
+  for (const habitacion of habitaciones) {
     await prisma.habitacion.upsert({
       where: {
-        numero,
+        numero: habitacion.numero,
       },
       update: {
-        capacidad: 3,
+        capacidad: habitacion.capacidad,
         activa: true,
       },
       create: {
-        numero,
-        capacidad: 3,
+        numero: habitacion.numero,
+        capacidad: habitacion.capacidad,
         estado: "DISPONIBLE",
         activa: true,
       },

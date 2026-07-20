@@ -360,6 +360,21 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         }
       }
 
+      if (conversationId) {
+        await actualizarEstadoConversacion(conversationId, {
+          fechaEntrada: new Date(`${fechaEntrada}T00:00:00`),
+          fechaSalida: new Date(`${fechaSalida}T00:00:00`),
+          cantidadPersonas: personas,
+          ultimaDisponibilidadAt: new Date(),
+          nombreCliente: null,
+          reservaId: null,
+          reservaIds: null,
+          step: resultado.disponible
+            ? "ESPERANDO_CONFIRMACION"
+            : "PIDIENDO_FECHAS",
+        });
+      }
+
       return {
         disponible: resultado.disponible,
         personas,
@@ -378,6 +393,36 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         throw new Error("No se encontró la conversación actual");
       }
 
+      const conversacion = await obtenerConversacionPorId(conversationId);
+
+      if (!conversacion.ultimaDisponibilidadAt) {
+        throw new Error(
+          "Primero debemos revisar la disponibilidad para las fechas actuales",
+        );
+      }
+
+      const minutosDesdeConsulta =
+        (Date.now() - conversacion.ultimaDisponibilidadAt.getTime()) /
+        (1000 * 60);
+
+      if (minutosDesdeConsulta > 10) {
+        throw new Error(
+          "La consulta de disponibilidad venció. Debemos revisar nuevamente",
+        );
+      }
+
+      if (
+        !conversacion.fechaEntrada ||
+        !conversacion.fechaSalida ||
+        !conversacion.cantidadPersonas
+      ) {
+        throw new Error("Faltan las fechas o la cantidad de personas");
+      }
+
+      if (conversacion.step !== "ESPERANDO_CONFIRMACION") {
+        throw new Error("La reserva todavía no está lista para confirmarse");
+      }
+
       const nombre = String(argumentos.nombre ?? "").trim();
 
       if (!nombre) {
@@ -387,15 +432,17 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
       const reservas = await crearReservasMultiples({
         nombre,
         telefono,
-        fechaEntrada: argumentos.fechaEntrada,
-        fechaSalida: argumentos.fechaSalida,
-        personas: Number(argumentos.personas),
+        fechaEntrada: formatearFecha(conversacion.fechaEntrada),
+        fechaSalida: formatearFecha(conversacion.fechaSalida),
+        personas: conversacion.cantidadPersonas,
       });
 
       await actualizarEstadoConversacion(conversationId, {
         nombreCliente: nombre,
+        reservaId: null,
         reservaIds: reservas.map((reserva) => reserva.id),
         step: "ESPERANDO_PAGO",
+        ultimaDisponibilidadAt: null,
       });
 
       return {

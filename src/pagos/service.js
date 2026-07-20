@@ -28,11 +28,11 @@ async function ejecutarTransaccionSerializable(operacion, intentosMaximos = 3) {
   throw new Error("No se pudo aprobar el pago por concurrencia.");
 }
 
-async function generarCodigoPago() {
+async function generarCodigoPago(tx = prisma) {
   while (true) {
     const codigo = `P${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const existente = await prisma.pago.findUnique({
+    const existente = await tx.pago.findUnique({
       where: {
         codigo,
       },
@@ -169,81 +169,93 @@ async function aprobarPagoSeguro(id) {
   });
 }
 
-export async function registrarComprobante({
-  reservaId,
-  comprobanteUrl,
-}) {
-  const reserva = await prisma.reserva.findUnique({
-    where: {
-      id: reservaId,
-    },
-    include: {
-      pago: true,
-      cliente: true,
-    },
-  });
+export async function registrarComprobantes({ reservaIds, comprobanteUrl }) {
+  const ids = [...new Set((reservaIds ?? []).filter(Boolean))];
 
-  if (!reserva) {
-    throw new Error("Reserva no encontrada");
+  if (ids.length === 0) {
+    throw new Error("No se indicó ninguna reserva");
   }
 
-  if (["CANCELADA", "CHECK_IN", "CHECK_OUT"].includes(reserva.estado)) {
-    throw new Error("La reserva ya no puede recibir comprobantes");
-  }
-
-  let pago = reserva.pago;
-
-  if (!pago) {
-    pago = await prisma.pago.create({
-      data: {
-        reservaId: reserva.id,
-        monto: reserva.precioTotal,
-        estado: "NO_GENERADO",
-      },
+  return ejecutarTransaccionSerializable(async (tx) => {
+    const reservas = await tx.reserva.findMany({
+      where: { id: { in: ids } },
+      include: { pago: true, cliente: true, habitacion: true },
     });
-  }
 
-  if (pago.estado === "APROBADO") {
-    throw new Error("Este pago ya fue aprobado anteriormente");
-  }
-
-  const codigo = pago.codigo ?? (await generarCodigoPago());
-  const llegoATiempo =
-    reserva.estado === "PENDIENTE_PAGO" &&
-    (!reserva.expiraEn || reserva.expiraEn > new Date());
-
-  return prisma.$transaction(async (tx) => {
-    if (llegoATiempo) {
-      await tx.reserva.update({
-        where: {
-          id: reserva.id,
-        },
-        data: {
-          expiraEn: null,
-        },
-      });
+    if (reservas.length !== ids.length) {
+      throw new Error("Una o más reservas no fueron encontradas");
     }
 
-    return tx.pago.update({
-      where: {
-        id: pago.id,
-      },
-      data: {
-        codigo,
-        comprobanteUrl,
-        estado: "PENDIENTE",
-        motivoRechazo: null,
-      },
-      include: {
-        reserva: {
-          include: {
-            cliente: true,
-            habitacion: true,
+    const porId = new Map(reservas.map((reserva) => [reserva.id, reserva]));
+    const ordenadas = ids.map((id) => porId.get(id));
+
+    for (const reserva of ordenadas) {
+      if (["CANCELADA", "CHECK_IN", "CHECK_OUT"].includes(reserva.estado)) {
+        throw new Error(`La reserva ${reserva.codigo} ya no puede recibir comprobantes`);
+      }
+
+      if (reserva.pago?.estado === "APROBADO") {
+        throw new Error(`El pago de ${reserva.codigo} ya fue aprobado`);
+      }
+    }
+
+    const pagos = [];
+    const ahora = new Date();
+
+    for (const reserva of ordenadas) {
+      let pago = reserva.pago;
+
+      if (!pago) {
+        pago = await tx.pago.create({
+          data: {
+            reservaId: reserva.id,
+            monto: reserva.precioTotal,
+            estado: "NO_GENERADO",
           },
-        },
-      },
-    });
+        });
+      }
+
+      const codigo = pago.codigo ?? (await generarCodigoPago(tx));
+      const llegoATiempo =
+        reserva.estado === "PENDIENTE_PAGO" &&
+        (!reserva.expiraEn || reserva.expiraEn > ahora);
+
+      if (llegoATiempo) {
+        await tx.reserva.update({
+          where: { id: reserva.id },
+          data: { expiraEn: null },
+        });
+      }
+
+      pagos.push(
+        await tx.pago.update({
+          where: { id: pago.id },
+          data: {
+            codigo,
+            comprobanteUrl,
+            estado: "PENDIENTE",
+            motivoRechazo: null,
+          },
+          include: {
+            reserva: {
+              include: { cliente: true, habitacion: true },
+            },
+          },
+        }),
+      );
+    }
+
+    return pagos;
   });
+}
+
+export async function registrarComprobante({ reservaId, comprobanteUrl }) {
+  const pagos = await registrarComprobantes({
+    reservaIds: [reservaId],
+    comprobanteUrl,
+  });
+
+  return pagos[0];
 }
 
 export async function obtenerPagoPorCodigo(codigo) {

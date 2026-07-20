@@ -113,22 +113,8 @@ export const hotelTools = [
         type: "STRING",
         description: "Nombre y apellido del cliente.",
       },
-      fechaEntrada: {
-        type: "STRING",
-      },
-      fechaSalida: {
-        type: "STRING",
-      },
-      personas: {
-        type: "NUMBER",
-      },
     },
-    required: [
-      "nombre",
-      "fechaEntrada",
-      "fechaSalida",
-      "personas",
-    ],
+    required: ["nombre"],
   },
 },
       {

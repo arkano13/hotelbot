@@ -12,7 +12,7 @@ import {
 import {
   iniciarSchedulerReportes,
   detenerSchedulerReportes,
-} from "./reportes/scheduler.js";
+} from "./reportes/Scheduler.js";
 
 import {
   iniciarSchedulerBackups,

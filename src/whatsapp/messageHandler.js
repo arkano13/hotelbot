@@ -17,7 +17,7 @@ import { generarRespuestaGemini, transcribirAudio } from "../ai/gemini.js";
 import {
   aprobarPagoPorCodigo,
   rechazarPagoPorCodigo,
-  registrarComprobante,
+  registrarComprobantes,
 } from "../pagos/service.js";
 
 import {
@@ -756,9 +756,13 @@ function formatearFechaCorta(fecha) {
 async function procesarComprobante({ socket, jid, telefono, message }) {
   const conversacion = await obtenerOCrearConversacion(telefono);
 
-  const reservaId = conversacion.reservaId;
+  const reservaIds = Array.isArray(conversacion.reservaIds)
+    ? conversacion.reservaIds.filter(Boolean)
+    : conversacion.reservaId
+      ? [conversacion.reservaId]
+      : [];
 
-  if (!reservaId) {
+  if (reservaIds.length === 0) {
     await socket.sendMessage(jid, {
       text: "No encontré una reserva activa asociada a este número. Primero completemos la reserva y luego me puedes enviar el comprobante.",
     });
@@ -795,8 +799,8 @@ async function procesarComprobante({ socket, jid, telefono, message }) {
 
   const comprobanteUrl = `${baseUrl}/uploads/comprobantes/${nombreArchivo}`;
 
-  const pago = await registrarComprobante({
-    reservaId,
+  const pagos = await registrarComprobantes({
+    reservaIds,
     comprobanteUrl,
   });
 
@@ -809,19 +813,35 @@ async function procesarComprobante({ socket, jid, telefono, message }) {
   await socket.sendMessage(jid, {
     text:
       `Recibí tu comprobante ✅\n` +
-      `Código de revisión: ${pago.codigo}\n` +
+      `${pagos.length === 1 ? "Código de revisión" : "Códigos de revisión"}: ${pagos
+        .map((pago) => pago.codigo)
+        .join(", ")}\n` +
       `En cuanto el hotel lo confirme, te aviso por aquí.`,
   });
 
   if (OWNER_PHONE) {
-    const reserva = pago.reserva;
+    const pagoPrincipal = pagos[0];
+    const reserva = pagoPrincipal.reserva;
     const cliente = reserva?.cliente;
+    const codigosReservas = pagos
+      .map((pago) => pago.reserva?.codigo ?? "N/A")
+      .join(", ");
+    const montoTotal = pagos.reduce(
+      (total, pago) => total + Number(pago.monto),
+      0,
+    );
+    const comandos = pagos
+      .map(
+        (pago) =>
+          `/${pago.codigo} aprobar\n/${pago.codigo} rechazar [motivo]`,
+      )
+      .join("\n");
 
     await socket.sendMessage(`${OWNER_PHONE}@s.whatsapp.net`, {
       image: buffer,
       caption:
-        `📸 Nuevo comprobante — ${pago.codigo}\n` +
-        `Reserva: ${reserva?.codigo ?? "N/A"} | Conversación: ${
+        `📸 Nuevo comprobante — ${pagos.map((pago) => pago.codigo).join(", ")}\n` +
+        `Reserva${pagos.length > 1 ? "s" : ""}: ${codigosReservas} | Conversación: ${
           conversacion.codigo
         }\n` +
         `Cliente: ${cliente?.nombre ?? "N/A"} (${formatearTelefono(
@@ -830,8 +850,8 @@ async function procesarComprobante({ socket, jid, telefono, message }) {
         `Fechas: ${formatearFechaCorta(
           reserva?.fechaEntrada,
         )} → ${formatearFechaCorta(reserva?.fechaSalida)}\n` +
-        `Monto esperado: L. ${Number(pago.monto).toFixed(2)}\n\n` +
-        `Responde:\n/${pago.codigo} aprobar\n/${pago.codigo} rechazar [motivo]`,
+        `Monto esperado total: L. ${montoTotal.toFixed(2)}\n\n` +
+        `Responde:\n${comandos}`,
     });
   }
 }

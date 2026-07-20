@@ -3,26 +3,26 @@
 // que el servidor (npm run dev) después de guardar los cambios.
 
 export const hotelInfo = {
-  nombre: "Hotel Ejemplo",
+  nombre: process.env.HOTEL_NOMBRE || "Hotel",
 
-  direccion: "Barrio El Centro, frente al parque central, Tegucigalpa",
+  direccion: process.env.HOTEL_DIRECCION || "Configura HOTEL_DIRECCION",
 
   ubicacion: {
     latitud: 14.0723,
     longitud: -87.1921,
   },
 
-  telefonoContacto: "504XXXXXXXX",
+  telefonoContacto: process.env.HOTEL_TELEFONO || "50400000000",
 
   horarios: {
     checkIn: "2:00 PM",
-    horaCheckOut: 13,
+    horaCheckOut: 11,
     atencion: "24 horas",
   },
 
   politicas: {
     cancelacion:
-      "Las reservas se pueden cancelar sin costo hasta 24 horas antes de la llegada. Después de eso se cobra la primera noche.",
+      "Las reservas pagadas pueden cancelarse, pero el pago es no reembolsable.",
     entradaAnticipada:
       "La entrada anticipada depende de disponibilidad, hay que preguntar el día de la llegada.",
     salidaTardia:
