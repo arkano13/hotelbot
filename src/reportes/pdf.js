@@ -79,7 +79,9 @@ function dibujarPiesDePagina(doc) {
   for (let i = 0; i < paginas.count; i++) {
     doc.switchToPage(i);
 
-    const yPie = doc.page.height - 40;
+    // Mantener el texto dentro del área imprimible evita que PDFKit agregue
+    // una página vacía al dibujar el pie.
+    const yPie = doc.page.height - MARGEN - 20;
 
     doc
       .moveTo(MARGEN, yPie)
@@ -96,14 +98,14 @@ function dibujarPiesDePagina(doc) {
         `${HOTEL_NOMBRE} · Reporte generado automáticamente`,
         MARGEN,
         yPie + 8,
-        { width: anchoUtil(doc) / 2, align: "left" }
+        { width: anchoUtil(doc) / 2, align: "left", lineBreak: false }
       );
 
     doc.text(
       `Página ${i + 1} de ${paginas.count}`,
       MARGEN + anchoUtil(doc) / 2,
       yPie + 8,
-      { width: anchoUtil(doc) / 2, align: "right" }
+      { width: anchoUtil(doc) / 2, align: "right", lineBreak: false }
     );
   }
 }
@@ -114,13 +116,16 @@ function dibujarSeccion(doc, texto) {
     doc.y = MARGEN;
   }
 
+  doc.x = MARGEN;
   doc.moveDown(0.6);
+
+  const yTitulo = doc.y;
 
   doc
     .font("Helvetica-Bold")
     .fontSize(12)
     .fillColor(COLOR_PRIMARIO)
-    .text(texto);
+    .text(texto, MARGEN, yTitulo, { width: anchoUtil(doc) });
 
   doc
     .moveTo(MARGEN, doc.y + 2)
@@ -130,6 +135,7 @@ function dibujarSeccion(doc, texto) {
     .stroke();
 
   doc.moveDown(0.5);
+  doc.x = MARGEN;
   doc.fillColor(COLOR_TEXTO);
 }
 
@@ -159,6 +165,7 @@ function dibujarTabla(doc, columnas, filas, filaVacia) {
     });
 
     doc.y = y + alturaFila;
+    doc.x = MARGEN;
     doc.fillColor(COLOR_TEXTO);
   }
 
@@ -176,11 +183,12 @@ function dibujarTabla(doc, columnas, filas, filaVacia) {
       .text(filaVacia, MARGEN + 6, y + 7, { width: ancho - 12 });
 
     doc.y = y + alturaFila;
+    doc.x = MARGEN;
     return;
   }
 
   filas.forEach((fila, indice) => {
-    if (doc.y + alturaFila > doc.page.height - 60) {
+    if (doc.y + alturaFila > doc.page.height - 90) {
       doc.addPage();
       doc.y = MARGEN;
       dibujarEncabezadoTabla();
@@ -207,9 +215,11 @@ function dibujarTabla(doc, columnas, filas, filaVacia) {
     });
 
     doc.y = y + alturaFila;
+    doc.x = MARGEN;
   });
 
   doc.moveDown(0.4);
+  doc.x = MARGEN;
 }
 
 function tarjetaMetrica(doc, x, y, ancho, etiqueta, valor) {
@@ -238,7 +248,11 @@ function formatearMoneda(valor) {
 }
 
 function formatearFecha(fecha) {
-  return new Date(fecha).toLocaleDateString("es-HN", {
+  const valor = /^\d{4}-\d{2}-\d{2}$/.test(String(fecha))
+    ? new Date(`${fecha}T12:00:00.000Z`)
+    : new Date(fecha);
+
+  return valor.toLocaleDateString("es-HN", {
     timeZone: "America/Tegucigalpa",
     weekday: "long",
     day: "numeric",
@@ -247,83 +261,162 @@ function formatearFecha(fecha) {
   });
 }
 
+function formatearFechaCorta(fecha) {
+  return new Date(fecha).toLocaleDateString("es-HN", {
+    timeZone: "America/Tegucigalpa",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatearHora(fecha) {
+  return new Date(fecha).toLocaleTimeString("es-HN", {
+    timeZone: "America/Tegucigalpa",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function recortar(valor, maximo) {
+  const texto = String(valor ?? "N/A");
+  return texto.length > maximo ? `${texto.slice(0, maximo - 3)}...` : texto;
+}
+
+function dibujarMetricas(doc, metricas, columnas = 3) {
+  const ancho = anchoUtil(doc);
+  const espacio = 12;
+  const anchoTarjeta = (ancho - espacio * (columnas - 1)) / columnas;
+  const yInicio = doc.y;
+
+  metricas.forEach(([etiqueta, valor], indice) => {
+    const fila = Math.floor(indice / columnas);
+    const columna = indice % columnas;
+    const x = MARGEN + columna * (anchoTarjeta + espacio);
+    const y = yInicio + fila * (56 + espacio);
+
+    tarjetaMetrica(doc, x, y, anchoTarjeta, etiqueta, valor);
+  });
+
+  doc.y = yInicio + Math.ceil(metricas.length / columnas) * (56 + espacio);
+  doc.x = MARGEN;
+}
+
+function columnasPagos(incluirFecha = false) {
+  if (incluirFecha) {
+    return [
+      { titulo: "Fecha", ancho: 0.13 },
+      { titulo: "Pago", ancho: 0.13 },
+      { titulo: "Reserva", ancho: 0.18 },
+      { titulo: "Cliente", ancho: 0.22 },
+      { titulo: "Hab.", ancho: 0.07, align: "center" },
+      { titulo: "Pers.", ancho: 0.07, align: "center" },
+      { titulo: "Monto", ancho: 0.2, align: "right" },
+    ];
+  }
+
+  return [
+    { titulo: "Hora", ancho: 0.1 },
+    { titulo: "Pago", ancho: 0.14 },
+    { titulo: "Reserva", ancho: 0.17 },
+    { titulo: "Cliente", ancho: 0.25 },
+    { titulo: "Hab.", ancho: 0.08, align: "center" },
+    { titulo: "Pers.", ancho: 0.08, align: "center" },
+    { titulo: "Monto", ancho: 0.18, align: "right" },
+  ];
+}
+
+function filasPagos(pagos, incluirFecha = false) {
+  return pagos.map((pago) => [
+    incluirFecha ? formatearFechaCorta(pago.fechaPago) : formatearHora(pago.fechaPago),
+    pago.codigoPago,
+    pago.codigoReserva,
+    recortar(pago.cliente, 24),
+    pago.habitacion,
+    pago.personas,
+    formatearMoneda(pago.monto),
+  ]);
+}
+
 export async function generarPdfDiario(resumen) {
-  return generarBuffer("Resumen diario de operaciones", (doc) => {
+  return generarBuffer("Reporte diario de ingresos confirmados", (doc) => {
     doc
       .font("Helvetica-Bold")
       .fontSize(14)
       .fillColor(COLOR_TEXTO)
       .text(formatearFecha(resumen.fecha));
 
-    doc.moveDown(0.8);
+    doc.moveDown(1);
 
-    dibujarSeccion(doc, `Llegadas (${resumen.llegan.length})`);
+    dibujarMetricas(doc, [
+      ["Ingresos recibidos", formatearMoneda(resumen.ingresosTotal)],
+      ["Por transferencia", formatearMoneda(resumen.ingresosTransferencia)],
+      ["En efectivo", formatearMoneda(resumen.ingresosEfectivo)],
+      ["Pagos confirmados", String(resumen.cantidadPagos)],
+      ["Huéspedes vendidos", String(resumen.huespedes)],
+      ["Ticket promedio", formatearMoneda(resumen.ticketPromedio)],
+    ]);
 
+    dibujarSeccion(
+      doc,
+      `Comprobantes aprobados (${resumen.cantidadTransferencias})`,
+    );
     dibujarTabla(
       doc,
-      [
-        { titulo: "Código", ancho: 0.14 },
-        { titulo: "Habitación", ancho: 0.12, align: "center" },
-        { titulo: "Cliente", ancho: 0.28 },
-        { titulo: "Teléfono", ancho: 0.16 },
-        { titulo: "Pers.", ancho: 0.08, align: "center" },
-        { titulo: "Total", ancho: 0.12, align: "right" },
-        { titulo: "Estado", ancho: 0.1, align: "center" },
-      ],
-      resumen.llegan.map((r) => [
-        r.codigo,
-        r.habitacion.numero,
-        r.cliente.nombre,
-        r.cliente.telefono,
-        r.cantidadPersonas,
-        formatearMoneda(r.precioTotal),
-        r.estado,
-      ]),
-      "Sin llegadas registradas para hoy."
+      columnasPagos(),
+      filasPagos(resumen.transferencias),
+      "No hubo comprobantes aprobados en este día.",
     );
 
-    dibujarSeccion(doc, `Salidas (${resumen.salen.length})`);
-
+    dibujarSeccion(
+      doc,
+      `Pagos en efectivo al llegar (${resumen.cantidadEfectivos})`,
+    );
     dibujarTabla(
       doc,
-      [
-        { titulo: "Código", ancho: 0.18 },
-        { titulo: "Habitación", ancho: 0.16, align: "center" },
-        { titulo: "Cliente", ancho: 0.36 },
-        { titulo: "Teléfono", ancho: 0.3 },
-      ],
-      resumen.salen.map((r) => [
-        r.codigo,
-        r.habitacion.numero,
-        r.cliente.nombre,
-        r.cliente.telefono,
-      ]),
-      "Sin salidas registradas para hoy."
+      columnasPagos(),
+      filasPagos(resumen.efectivos),
+      "No hubo ingresos en efectivo en este día.",
     );
 
-    dibujarSeccion(doc, `Pagos pendientes de revisar (${resumen.pagosPendientes.length})`);
+    if (resumen.cancelacionesSinReembolso.length > 0) {
+      dibujarSeccion(
+        doc,
+        `Cancelaciones sin reembolso (${resumen.cancelacionesSinReembolso.length})`,
+      );
+      dibujarTabla(
+        doc,
+        [
+          { titulo: "Reserva", ancho: 0.2 },
+          { titulo: "Cliente", ancho: 0.38 },
+          { titulo: "Método", ancho: 0.2 },
+          { titulo: "Ingreso", ancho: 0.22, align: "right" },
+        ],
+        resumen.cancelacionesSinReembolso.map((pago) => [
+          pago.codigoReserva,
+          recortar(pago.cliente, 30),
+          pago.metodo,
+          formatearMoneda(pago.monto),
+        ]),
+        "Sin cancelaciones pagadas.",
+      );
+    }
 
-    dibujarTabla(
-      doc,
-      [
-        { titulo: "Código pago", ancho: 0.16 },
-        { titulo: "Reserva", ancho: 0.16 },
-        { titulo: "Cliente", ancho: 0.38 },
-        { titulo: "Monto", ancho: 0.3, align: "right" },
-      ],
-      resumen.pagosPendientes.map((p) => [
-        p.codigo ?? "N/A",
-        p.reserva?.codigo ?? "N/A",
-        p.reserva?.cliente?.nombre ?? "N/A",
-        formatearMoneda(p.monto),
-      ]),
-      "No hay pagos pendientes de revisión."
-    );
+    dibujarSeccion(doc, "Criterio del reporte");
+    doc
+      .font("Helvetica")
+      .fontSize(9)
+      .fillColor(COLOR_TEXTO_SUAVE)
+      .text(
+        "Solo se incluyen comprobantes aprobados y pagos en efectivo registrados al llegar. Se excluyen reservas sin pago, comprobantes pendientes, rechazados y vencidos.",
+        { width: anchoUtil(doc) },
+      );
   });
 }
 
 export async function generarPdfMensual(resumen) {
-  return generarBuffer("Resumen mensual de operaciones", (doc) => {
+  return generarBuffer("Reporte mensual de ingresos confirmados", (doc) => {
     doc
       .font("Helvetica-Bold")
       .fontSize(14)
@@ -332,43 +425,105 @@ export async function generarPdfMensual(resumen) {
 
     doc.moveDown(1);
 
-    const ancho = anchoUtil(doc);
-    const columnas = 3;
-    const espacio = 12;
-    const anchoTarjeta = (ancho - espacio * (columnas - 1)) / columnas;
-
-    const metricas = [
-      ["Reservas creadas", String(resumen.totalReservas)],
+    dibujarMetricas(doc, [
+      ["Ingresos recibidos", formatearMoneda(resumen.ingresosTotal)],
+      ["Por transferencia", formatearMoneda(resumen.ingresosTransferencia)],
+      ["En efectivo", formatearMoneda(resumen.ingresosEfectivo)],
+      ["Pagos confirmados", String(resumen.cantidadPagos)],
+      ["Huéspedes vendidos", String(resumen.huespedes)],
+      ["Ticket promedio", formatearMoneda(resumen.ticketPromedio)],
       ["Noches vendidas", String(resumen.nochesVendidas)],
-      ["Ocupación estimada", `${resumen.ocupacionPorcentaje.toFixed(1)}%`],
-      ["Ingresos confirmados", formatearMoneda(resumen.ingresos)],
-      ["Pagos aprobados", String(resumen.pagosAprobadosCantidad)],
-      ["Canceladas / expiradas", String(resumen.canceladas)],
-    ];
+      ["Ocupación confirmada", `${resumen.ocupacionPorcentaje.toFixed(1)}%`],
+      ["Cancelaciones sin devolución", String(resumen.cancelacionesSinReembolso.length)],
+    ]);
 
-    const yInicio = doc.y;
+    dibujarSeccion(doc, "Ingresos por método de pago");
+    dibujarTabla(
+      doc,
+      [
+        { titulo: "Método", ancho: 0.34 },
+        { titulo: "Pagos", ancho: 0.2, align: "center" },
+        { titulo: "Huéspedes", ancho: 0.2, align: "center" },
+        { titulo: "Ingresos", ancho: 0.26, align: "right" },
+      ],
+      [
+        [
+          "TRANSFERENCIA",
+          resumen.cantidadTransferencias,
+          resumen.transferencias.reduce((total, pago) => total + pago.personas, 0),
+          formatearMoneda(resumen.ingresosTransferencia),
+        ],
+        [
+          "EFECTIVO",
+          resumen.cantidadEfectivos,
+          resumen.efectivos.reduce((total, pago) => total + pago.personas, 0),
+          formatearMoneda(resumen.ingresosEfectivo),
+        ],
+      ],
+      "No hubo ingresos confirmados durante el mes.",
+    );
 
-    metricas.forEach(([etiqueta, valor], indice) => {
-      const fila = Math.floor(indice / columnas);
-      const columna = indice % columnas;
+    dibujarSeccion(doc, "Ingresos confirmados por día");
+    dibujarTabla(
+      doc,
+      [
+        { titulo: "Fecha", ancho: 0.18 },
+        { titulo: "Pagos", ancho: 0.12, align: "center" },
+        { titulo: "Huéspedes", ancho: 0.14, align: "center" },
+        { titulo: "Transfer.", ancho: 0.19, align: "right" },
+        { titulo: "Efectivo", ancho: 0.17, align: "right" },
+        { titulo: "Total", ancho: 0.2, align: "right" },
+      ],
+      resumen.pagosPorDia.map((dia) => [
+        dia.fecha,
+        dia.cantidadPagos,
+        dia.huespedes,
+        formatearMoneda(dia.transferencias),
+        formatearMoneda(dia.efectivos),
+        formatearMoneda(dia.total),
+      ]),
+      "No hubo días con ingresos confirmados.",
+    );
 
-      const x = MARGEN + columna * (anchoTarjeta + espacio);
-      const y = yInicio + fila * (56 + espacio);
+    dibujarSeccion(doc, "Rendimiento por habitación");
+    dibujarTabla(
+      doc,
+      [
+        { titulo: "Habitación", ancho: 0.18, align: "center" },
+        { titulo: "Pagos", ancho: 0.14, align: "center" },
+        { titulo: "Huéspedes", ancho: 0.18, align: "center" },
+        { titulo: "Noches", ancho: 0.16, align: "center" },
+        { titulo: "Ingresos", ancho: 0.34, align: "right" },
+      ],
+      resumen.rendimientoHabitaciones.map((habitacion) => [
+        habitacion.habitacion,
+        habitacion.pagos,
+        habitacion.huespedes,
+        habitacion.nochesVendidas,
+        formatearMoneda(habitacion.ingresos),
+      ]),
+      "No hay habitaciones con ingresos confirmados.",
+    );
 
-      tarjetaMetrica(doc, x, y, anchoTarjeta, etiqueta, valor);
-    });
-
-    doc.y = yInicio + Math.ceil(metricas.length / columnas) * (56 + espacio);
+    dibujarSeccion(doc, `Detalle de cobros (${resumen.cantidadPagos})`);
+    dibujarTabla(
+      doc,
+      columnasPagos(true),
+      filasPagos(resumen.pagos, true),
+      "No hubo pagos confirmados durante el mes.",
+    );
 
     dibujarSeccion(doc, "Notas");
-
+    const mejorDiaTexto = resumen.mejorDia
+      ? `El día con más ingresos fue ${resumen.mejorDia.fecha}, con ${formatearMoneda(resumen.mejorDia.total)}. `
+      : "";
     doc
       .font("Helvetica")
       .fontSize(9)
       .fillColor(COLOR_TEXTO_SUAVE)
       .text(
-        "La ocupación estimada se calcula con base en las noches vendidas frente a la capacidad total del hotel durante el mes. Los ingresos corresponden únicamente a pagos aprobados en el periodo.",
-        { width: anchoUtil(doc) }
+        `${mejorDiaTexto}La ocupación se calcula con estadías pagadas y activas durante el mes. Los ingresos solo incluyen comprobantes aprobados y pagos en efectivo; se excluyen pagos pendientes, rechazados, vencidos y no generados.`,
+        { width: anchoUtil(doc) },
       );
   });
 }

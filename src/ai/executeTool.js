@@ -173,6 +173,12 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         precioTotal: Number(reserva.precioTotal),
         moneda: "HNL",
         estado: reserva.estado,
+        datosPago: {
+          banco: hotelInfo.pagos.banco,
+          titular: hotelInfo.pagos.titular,
+          tipoCuenta: hotelInfo.pagos.tipoCuenta,
+          numeroCuenta: hotelInfo.pagos.numeroCuenta,
+        },
       };
     }
 
@@ -454,6 +460,12 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
           0,
         ),
         moneda: "HNL",
+        datosPago: {
+          banco: hotelInfo.pagos.banco,
+          titular: hotelInfo.pagos.titular,
+          tipoCuenta: hotelInfo.pagos.tipoCuenta,
+          numeroCuenta: hotelInfo.pagos.numeroCuenta,
+        },
       };
     }
 

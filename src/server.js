@@ -58,19 +58,14 @@ async function iniciarServidor() {
     console.log("✅ Base de datos conectada");
 
     servidor = app.listen(PORT, () => {
-      console.log(
-        `✅ Servidor ejecutándose en http://localhost:${PORT}`
-      );
+      console.log(`✅ Servidor ejecutándose en http://localhost:${PORT}`);
     });
 
     await iniciarWhatsApp();
 
     iniciarSchedulers();
   } catch (error) {
-    console.error(
-      "❌ Error iniciando el servidor:",
-      error
-    );
+    console.error("❌ Error iniciando el servidor:", error);
 
     detenerSchedulers();
 
@@ -79,9 +74,7 @@ async function iniciarServidor() {
       servidor = null;
     }
 
-    await prisma
-      .$disconnect()
-      .catch(() => {});
+    await prisma.$disconnect().catch(() => {});
 
     process.exit(1);
   }
@@ -94,32 +87,23 @@ async function cerrarServidor(signal) {
 
   cerrando = true;
 
-  console.log(
-    `\n🛑 Cerrando servidor por ${signal}...`
-  );
+  console.log(`\n🛑 Cerrando servidor por ${signal}...`);
 
   detenerSchedulers();
 
   if (servidor) {
     await new Promise((resolve) => {
       servidor.close(() => {
-        console.log(
-          "✅ Servidor HTTP cerrado"
-        );
+        console.log("✅ Servidor HTTP cerrado");
 
         resolve();
       });
     });
   }
 
-  await prisma
-    .$disconnect()
-    .catch((error) => {
-      console.error(
-        "❌ Error desconectando Prisma:",
-        error
-      );
-    });
+  await prisma.$disconnect().catch((error) => {
+    console.error("❌ Error desconectando Prisma:", error);
+  });
 
   console.log("✅ Servidor cerrado");
 
@@ -134,28 +118,14 @@ process.on("SIGTERM", () => {
   cerrarServidor("SIGTERM");
 });
 
-process.on(
-  "unhandledRejection",
-  (error) => {
-    console.error(
-      "❌ Promesa no controlada:",
-      error
-    );
-  }
-);
+process.on("unhandledRejection", (error) => {
+  console.error("❌ Promesa no controlada:", error);
+});
 
-process.on(
-  "uncaughtException",
-  (error) => {
-    console.error(
-      "❌ Error no controlado:",
-      error
-    );
+process.on("uncaughtException", (error) => {
+  console.error("❌ Error no controlado:", error);
 
-    cerrarServidor(
-      "uncaughtException"
-    );
-  }
-);
+  cerrarServidor("uncaughtException");
+});
 
 iniciarServidor();

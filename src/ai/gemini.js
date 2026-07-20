@@ -61,16 +61,61 @@ async function generarConReintentos(payload, intentosMaximos = 4) {
 function convertirHistorial(messages = []) {
   return messages
     .filter(
-      (message) => message.role === "USER" || message.role === "ASSISTANT",
+      (message) =>
+        (message.role === "USER" || message.role === "ASSISTANT") &&
+        typeof message.content === "string" &&
+        message.content.trim().length > 0,
     )
     .map((message) => ({
       role: message.role === "ASSISTANT" ? "model" : "user",
       parts: [
         {
-          text: message.content,
+          text: message.content.trim(),
         },
       ],
     }));
+}
+
+function respuestaTieneContenido(response) {
+  const texto = response.text?.trim();
+  const llamadas = response.functionCalls ?? [];
+
+  return Boolean(texto) || llamadas.length > 0;
+}
+
+async function generarConRespuestaValida(payload, intentosMaximos = 3) {
+  let ultimaRespuesta;
+
+  for (let intento = 1; intento <= intentosMaximos; intento++) {
+    const response = await generarConReintentos(payload);
+    ultimaRespuesta = response;
+
+    if (respuestaTieneContenido(response)) {
+      return response;
+    }
+
+    const motivo = response.candidates?.[0]?.finishReason ?? "DESCONOCIDO";
+
+    if (intento < intentosMaximos) {
+      const esperaMs = 500 * intento;
+
+      console.warn(
+        `⚠️ Gemini respondió vacío (${motivo}). Reintento ${intento}/${intentosMaximos} en ${esperaMs} ms`,
+      );
+
+      await esperar(esperaMs);
+    }
+  }
+
+  console.dir(ultimaRespuesta?.candidates?.[0], {
+    depth: null,
+  });
+
+  const error = new Error(
+    "Gemini no generó texto ni solicitó una herramienta después de varios intentos",
+  );
+  error.code = "GEMINI_EMPTY_RESPONSE";
+  throw error;
 }
 
 function obtenerFechaActual() {
@@ -176,7 +221,7 @@ REGLAS GENERALES:
   const MAX_RONDAS = 5;
 
   for (let ronda = 1; ronda <= MAX_RONDAS; ronda++) {
-    const response = await generarConReintentos({
+    const response = await generarConRespuestaValida({
       model: MODEL,
       contents,
       config,
@@ -191,11 +236,7 @@ REGLAS GENERALES:
         return texto;
       }
 
-      console.dir(response.candidates?.[0], {
-        depth: null,
-      });
-
-      throw new Error("Gemini no generó texto ni solicitó una herramienta");
+      throw new Error("Gemini devolvió una respuesta sin contenido utilizable");
     }
 
     const contenidoModelo = response.candidates?.[0]?.content;

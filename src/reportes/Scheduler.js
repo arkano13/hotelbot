@@ -5,6 +5,10 @@ import {
   obtenerResumenDiario,
   obtenerResumenMensual,
 } from "./service.js";
+import {
+  generarPdfDiario,
+  generarPdfMensual,
+} from "./pdf.js";
 
 import { obtenerWhatsAppSocket } from "../whatsapp/client.js";
 import { DATA_DIR } from "../lib/paths.js";
@@ -24,21 +28,57 @@ let ultimoMesEnviado = null;
 let ejecutando = false;
 let estadoCargado = false;
 
+function formatearMoneda(valor) {
+  return `L. ${Number(valor).toLocaleString("es-HN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function sumarDias(fechaISO, cantidad) {
+  const fecha = new Date(`${fechaISO}T12:00:00.000Z`);
+  fecha.setUTCDate(fecha.getUTCDate() + cantidad);
+  return fecha.toISOString().slice(0, 10);
+}
+
 async function guardarEstado() {
   await fs.mkdir(DATA_DIR, { recursive: true });
 
   const temporal = `${RUTA_ESTADO}.tmp`;
   const contenido = JSON.stringify(
-    {
-      ultimaFechaDiaria,
-      ultimoMesEnviado,
-    },
+    { ultimaFechaDiaria, ultimoMesEnviado },
     null,
-    2
+    2,
   );
 
   await fs.writeFile(temporal, contenido, "utf-8");
   await fs.rename(temporal, RUTA_ESTADO);
+}
+
+function obtenerFechaHoraHonduras() {
+  const formateador = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ZONA_HORARIA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
+
+  const partes = Object.fromEntries(
+    formateador
+      .formatToParts(new Date())
+      .filter((parte) => parte.type !== "literal")
+      .map((parte) => [parte.type, parte.value]),
+  );
+
+  return {
+    fechaISO: `${partes.year}-${partes.month}-${partes.day}`,
+    anio: Number(partes.year),
+    mes: Number(partes.month),
+    dia: Number(partes.day),
+    hora: Number(partes.hour),
+  };
 }
 
 async function cargarEstado() {
@@ -58,8 +98,6 @@ async function cargarEstado() {
 
     const datos = obtenerFechaHoraHonduras();
 
-    // Al instalar esta versión después de la hora del reporte, asumimos
-    // que el reporte del día ya fue enviado para evitar un duplicado.
     if (datos.hora >= HORA_REPORTE) {
       ultimaFechaDiaria = datos.fechaISO;
 
@@ -74,80 +112,56 @@ async function cargarEstado() {
   estadoCargado = true;
 }
 
-function obtenerFechaHoraHonduras() {
-  const formateador = new Intl.DateTimeFormat("en-CA", {
-    timeZone: ZONA_HORARIA,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23",
-  });
-
-  const partes = Object.fromEntries(
-    formateador
-      .formatToParts(new Date())
-      .filter((parte) => parte.type !== "literal")
-      .map((parte) => [parte.type, parte.value])
-  );
-
-  return {
-    fechaISO: `${partes.year}-${partes.month}-${partes.day}`,
-    anio: Number(partes.year),
-    mes: Number(partes.month),
-    dia: Number(partes.day),
-    hora: Number(partes.hour),
-  };
-}
-
-function formatearReserva(reserva) {
-  return (
-    `Habitación ${reserva.habitacion.numero} — ` +
-    `${reserva.cliente.nombre} (${reserva.codigo})`
-  );
-}
-
-function crearTextoDiario(resumen) {
-  const llegadas = resumen.llegan.length
-    ? resumen.llegan.map(formatearReserva).join("\n")
-    : "Ninguna";
-
-  const salidas = resumen.salen.length
-    ? resumen.salen.map(formatearReserva).join("\n")
-    : "Ninguna";
-
-  const pagos = resumen.pagosPendientes.length
-    ? resumen.pagosPendientes
-        .map((pago) => `${pago.codigo || "SIN-CÓDIGO"} — ${pago.reserva.cliente.nombre}`)
-        .join("\n")
-    : "Ninguno";
-
-  return (
-    `📋 Reporte diario — ${resumen.fecha}\n\n` +
-    `🟢 Llegadas:\n${llegadas}\n\n` +
-    `🚪 Salidas:\n${salidas}\n\n` +
-    `💳 Pagos pendientes:\n${pagos}`
-  );
-}
-
-function crearTextoMensual(resumen) {
-  return (
-    `📊 Reporte mensual — ${resumen.mes}/${resumen.anio}\n\n` +
-    `Reservas: ${resumen.totalReservas}\n` +
-    `Noches vendidas: ${resumen.nochesVendidas}\n` +
-    `Ingresos: L. ${resumen.ingresos.toFixed(2)}\n` +
-    `Canceladas/expiradas: ${resumen.canceladas}\n` +
-    `Ocupación: ${resumen.ocupacionPorcentaje.toFixed(1)}%`
-  );
-}
-
-async function enviarAlJefe(texto) {
+async function enviarDocumentoAlJefe({ buffer, nombreArchivo, texto }) {
   if (!OWNER_PHONE) {
     throw new Error("OWNER_PHONE no está configurado");
   }
 
   const socket = obtenerWhatsAppSocket();
-  await socket.sendMessage(`${OWNER_PHONE}@s.whatsapp.net`, { text: texto });
+  await socket.sendMessage(`${OWNER_PHONE}@s.whatsapp.net`, {
+    document: buffer,
+    mimetype: "application/pdf",
+    fileName: nombreArchivo,
+    caption: texto,
+  });
+}
+
+export async function enviarReporteDiario(fechaISO) {
+  const resumen = await obtenerResumenDiario(fechaISO);
+  const pdf = await generarPdfDiario(resumen);
+
+  await enviarDocumentoAlJefe({
+    buffer: pdf,
+    nombreArchivo: `reporte-diario-${fechaISO}.pdf`,
+    texto:
+      `📋 Reporte diario de ingresos - ${fechaISO}\n` +
+      `Total recibido: ${formatearMoneda(resumen.ingresosTotal)}\n` +
+      `Transferencias: ${formatearMoneda(resumen.ingresosTransferencia)}\n` +
+      `Efectivo: ${formatearMoneda(resumen.ingresosEfectivo)}\n` +
+      `Pagos confirmados: ${resumen.cantidadPagos}`,
+  });
+
+  return resumen;
+}
+
+export async function enviarReporteMensual(anio, mes) {
+  const resumen = await obtenerResumenMensual(anio, mes);
+  const pdf = await generarPdfMensual(resumen);
+  const mesTexto = String(mes).padStart(2, "0");
+
+  await enviarDocumentoAlJefe({
+    buffer: pdf,
+    nombreArchivo: `reporte-mensual-${anio}-${mesTexto}.pdf`,
+    texto:
+      `📊 Reporte mensual de ingresos - ${mesTexto}/${anio}\n` +
+      `Total recibido: ${formatearMoneda(resumen.ingresosTotal)}\n` +
+      `Transferencias: ${formatearMoneda(resumen.ingresosTransferencia)}\n` +
+      `Efectivo: ${formatearMoneda(resumen.ingresosEfectivo)}\n` +
+      `Pagos confirmados: ${resumen.cantidadPagos}\n` +
+      `Ocupación confirmada: ${resumen.ocupacionPorcentaje.toFixed(1)}%`,
+  });
+
+  return resumen;
 }
 
 async function revisarReportes() {
@@ -159,15 +173,14 @@ async function revisarReportes() {
 
   try {
     await cargarEstado();
-
     const datos = obtenerFechaHoraHonduras();
 
     if (datos.hora >= HORA_REPORTE && ultimaFechaDiaria !== datos.fechaISO) {
-      const diario = await obtenerResumenDiario(datos.fechaISO);
-      await enviarAlJefe(crearTextoDiario(diario));
+      const fechaReporte = sumarDias(datos.fechaISO, -1);
+      await enviarReporteDiario(fechaReporte);
       ultimaFechaDiaria = datos.fechaISO;
       await guardarEstado();
-      console.log(`📋 Reporte diario enviado: ${datos.fechaISO}`);
+      console.log(`📋 Reporte diario PDF enviado: ${fechaReporte}`);
     }
 
     const claveMes = `${datos.anio}-${String(datos.mes).padStart(2, "0")}`;
@@ -180,11 +193,11 @@ async function revisarReportes() {
       const fechaMesAnterior = new Date(Date.UTC(datos.anio, datos.mes - 2, 1));
       const anioAnterior = fechaMesAnterior.getUTCFullYear();
       const mesAnterior = fechaMesAnterior.getUTCMonth() + 1;
-      const mensual = await obtenerResumenMensual(anioAnterior, mesAnterior);
-      await enviarAlJefe(crearTextoMensual(mensual));
+
+      await enviarReporteMensual(anioAnterior, mesAnterior);
       ultimoMesEnviado = claveMes;
       await guardarEstado();
-      console.log(`📊 Reporte mensual enviado: ${mesAnterior}/${anioAnterior}`);
+      console.log(`📊 Reporte mensual PDF enviado: ${mesAnterior}/${anioAnterior}`);
     }
   } catch (error) {
     console.error("❌ Error generando reportes automáticos:", error);
@@ -199,7 +212,7 @@ export function iniciarSchedulerReportes() {
   }
 
   console.log(
-    `✅ Scheduler de reportes iniciado: reporte diario desde las ${HORA_REPORTE}:00 Honduras`
+    `✅ Scheduler de reportes iniciado: PDF diario del día anterior desde las ${HORA_REPORTE}:00 Honduras`,
   );
 
   revisarReportes().catch(console.error);
@@ -216,6 +229,5 @@ export function detenerSchedulerReportes() {
 
   clearInterval(intervalo);
   intervalo = null;
-
   console.log("🛑 Scheduler de reportes detenido");
 }

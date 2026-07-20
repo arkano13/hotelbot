@@ -2,6 +2,7 @@ import {
   expirarReservasPendientes,
   procesarCheckoutsAutomaticos,
 } from "./expirationService.js";
+import { obtenerHoraCheckOutTexto } from "../config/hotelInfo.js";
 
 const INTERVALO_REVISION_MS = 60 * 1000;
 
@@ -31,7 +32,7 @@ export function iniciarExpiracionReservas() {
   }
 
   console.log(
-    "✅ Scheduler de reservas iniciado: expiraciones cada minuto y checkout a las 11:00 AM Honduras"
+    `✅ Scheduler de reservas iniciado: expiraciones cada minuto y checkout a las ${obtenerHoraCheckOutTexto()} Honduras`,
   );
 
   revisarReservas().catch(console.error);
