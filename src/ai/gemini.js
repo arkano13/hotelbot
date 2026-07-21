@@ -83,7 +83,7 @@ function respuestaTieneContenido(response) {
   return Boolean(texto) || llamadas.length > 0;
 }
 
-async function generarConRespuestaValida(payload, intentosMaximos = 3) {
+async function generarConRespuestaValida(payload, intentosMaximos = 5) {
   let ultimaRespuesta;
 
   for (let intento = 1; intento <= intentosMaximos; intento++) {
@@ -215,7 +215,7 @@ REGLAS GENERALES:
 
     tools: hotelTools,
     temperature: 0.2,
-    maxOutputTokens: 500,
+    maxOutputTokens: 1000,
   };
 
   const MAX_RONDAS = 5;

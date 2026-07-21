@@ -2,9 +2,9 @@ import { prisma } from "../src/lib/prisma.js";
 
 async function crearTarifas() {
   const tarifas = [
-    { personas: 1, precio: 700, activa: true },
-    { personas: 2, precio: 900, activa: true },
-    { personas: 3, precio: 1100, activa: true },
+    { personas: 1, precio: 500, activa: true },
+    { personas: 2, precio: 650, activa: true },
+    { personas: 3, precio: 800, activa: true },
   ];
 
   for (const tarifa of tarifas) {
@@ -26,13 +26,14 @@ async function crearTarifas() {
 async function crearHabitaciones() {
   const habitaciones = [
     { numero: "1", capacidad: 1 },
-    { numero: "2", capacidad: 1 },
-    { numero: "3", capacidad: 1 },
-    { numero: "4", capacidad: 2 },
+    { numero: "6", capacidad: 1 },
+    { numero: "7", capacidad: 1 },
+    { numero: "9", capacidad: 1 },
+    { numero: "2", capacidad: 2 },
     { numero: "5", capacidad: 2 },
-    { numero: "6", capacidad: 2 },
-    { numero: "7", capacidad: 3 },
-    { numero: "8", capacidad: 3 },
+    { numero: "8", capacidad: 2 },
+    { numero: "3", capacidad: 3 },
+    { numero: "4", capacidad: 3 },
   ];
 
   for (const habitacion of habitaciones) {

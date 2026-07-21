@@ -11,7 +11,6 @@ import {
   obtenerReservaMasRecientePorTelefono,
   obtenerReservaPorCodigo,
 } from "../reservas/service.js";
-import { obtenerImagenesHabitacion } from "../imagenes/service.js";
 
 import { flujosJefe } from "../lib/flujosJefe.js";
 
@@ -143,6 +142,18 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         throw new Error("El nombre y apellido son obligatorios");
       }
 
+      const documento = String(argumentos.documento ?? "").trim();
+
+      if (!documento) {
+        throw new Error("El número de identidad es obligatorio");
+      }
+
+      const metodoPago = String(argumentos.metodo_pago ?? "").trim().toLowerCase();
+
+      if (!["efectivo", "transferencia"].includes(metodoPago)) {
+        throw new Error("Debes indicar el método de pago: efectivo o transferencia");
+      }
+
       const fechaEntrada = formatearFecha(conversacion.fechaEntrada);
 
       const fechaSalida = formatearFecha(conversacion.fechaSalida);
@@ -153,14 +164,32 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         fechaEntrada,
         fechaSalida,
         personas: conversacion.cantidadPersonas,
+        documento,
+        metodoPago,
       });
 
       await actualizarEstadoConversacion(conversationId, {
         nombreCliente: nombre,
         reservaId: reserva.id,
-        step: "ESPERANDO_PAGO",
+        step: metodoPago === "efectivo" ? "COMPLETADO" : "ESPERANDO_PAGO",
         ultimaDisponibilidadAt: null,
       });
+
+      if (metodoPago === "efectivo") {
+        return {
+          codigo: reserva.codigo,
+          nombreCliente: nombre,
+          fechaEntrada: formatearFecha(reserva.fechaEntrada),
+          fechaSalida: formatearFecha(reserva.fechaSalida),
+          personas: reserva.cantidadPersonas,
+          noches: reserva.cantidadNoches,
+          precioTotal: Number(reserva.precioTotal),
+          moneda: "HNL",
+          metodoPago: "efectivo",
+          horasLimite: 24,
+          estado: reserva.estado,
+        };
+      }
 
       return {
         codigo: reserva.codigo,
@@ -172,6 +201,7 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         precioPorNoche: Number(reserva.precioPorNoche),
         precioTotal: Number(reserva.precioTotal),
         moneda: "HNL",
+        metodoPago: "transferencia",
         estado: reserva.estado,
         datosPago: {
           banco: hotelInfo.pagos.banco,
@@ -233,11 +263,25 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
 
       const ownerJid = `${ownerPhone}@s.whatsapp.net`;
 
-      flujosJefe.set(ownerJid, {
-        tipo: "ESCALAR_CONFIRMACION",
+      const nuevaEscalacion = {
         conversationId,
         telefonoCliente: telefono,
-      });
+        codigoConversacion,
+        motivo,
+      };
+
+      const flujoActual = flujosJefe.get(ownerJid);
+
+      if (flujoActual?.tipo === "ESCALAR_CONFIRMACION") {
+        // Ya hay una escalación pendiente de respuesta: se encola en vez de
+        // pisarla, para no perder la solicitud de este cliente.
+        flujoActual.cola.push(nuevaEscalacion);
+      } else {
+        flujosJefe.set(ownerJid, {
+          tipo: "ESCALAR_CONFIRMACION",
+          cola: [nuevaEscalacion],
+        });
+      }
 
       await socket.sendMessage(ownerJid, {
         text:
@@ -266,6 +310,16 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
       const reserva = codigoReserva
         ? await obtenerReservaPorCodigo(codigoReserva)
         : await obtenerReservaMasRecientePorTelefono(telefono);
+
+      // No revelar reservas de otras personas: si el código pertenece a un
+      // cliente distinto al que está preguntando, se responde igual que si
+      // no existiera (no se confirma ni se niega su existencia).
+      if (reserva && reserva.cliente?.telefono !== telefono) {
+        return {
+          encontrada: false,
+          mensaje: "No encontré ninguna reserva asociada a este número.",
+        };
+      }
 
       if (!reserva) {
         return {
@@ -306,43 +360,6 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
       };
     }
 
-    case "enviar_fotos": {
-      if (!socket || !jid) {
-        throw new Error("No se pudo acceder al chat de WhatsApp");
-      }
-
-      const tipoSolicitado = String(
-        argumentos?.tipo ?? "habitacion"
-      ).toLowerCase();
-
-      const tipo = tipoSolicitado.startsWith("general")
-        ? "GENERAL"
-        : "HABITACION";
-
-      const imagenes = await obtenerImagenesHabitacion(tipo);
-
-      for (let i = 0; i < imagenes.length; i++) {
-        const imagen = imagenes[i];
-
-        await socket.sendMessage(jid, {
-          image: {
-            url: imagen.url,
-          },
-          caption:
-            i === 0
-              ? tipo === "GENERAL"
-                ? "Estas son algunas fotos de nuestro hotel."
-                : "Estas son algunas fotos de nuestras habitaciones."
-              : undefined,
-        });
-      }
-
-      return {
-        enviadas: true,
-        cantidad: imagenes.length,
-        tipo,
-      };
-    }
     case "buscar_disponibilidad_multiple": {
       const fechaEntrada = argumentos.fechaEntrada;
       const fechaSalida = argumentos.fechaSalida;
@@ -435,31 +452,60 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         throw new Error("El nombre y apellido son obligatorios");
       }
 
+      const documento = String(argumentos.documento ?? "").trim();
+
+      if (!documento) {
+        throw new Error("El número de identidad es obligatorio");
+      }
+
+      const metodoPago = String(argumentos.metodo_pago ?? "").trim().toLowerCase();
+
+      if (!["efectivo", "transferencia"].includes(metodoPago)) {
+        throw new Error("Debes indicar el método de pago: efectivo o transferencia");
+      }
+
       const reservas = await crearReservasMultiples({
         nombre,
         telefono,
         fechaEntrada: formatearFecha(conversacion.fechaEntrada),
         fechaSalida: formatearFecha(conversacion.fechaSalida),
         personas: conversacion.cantidadPersonas,
+        documento,
+        metodoPago,
       });
 
       await actualizarEstadoConversacion(conversationId, {
         nombreCliente: nombre,
         reservaId: null,
         reservaIds: reservas.map((reserva) => reserva.id),
-        step: "ESPERANDO_PAGO",
+        step: metodoPago === "efectivo" ? "COMPLETADO" : "ESPERANDO_PAGO",
         ultimaDisponibilidadAt: null,
       });
+
+      const precioTotal = reservas.reduce(
+        (total, reserva) => total + Number(reserva.precioTotal),
+        0,
+      );
+
+      if (metodoPago === "efectivo") {
+        return {
+          cantidadReservas: reservas.length,
+          codigos: reservas.map((reserva) => reserva.codigo),
+          distribucion: reservas.map((reserva) => reserva.cantidadPersonas),
+          precioTotal,
+          moneda: "HNL",
+          metodoPago: "efectivo",
+          horasLimite: 24,
+        };
+      }
 
       return {
         cantidadReservas: reservas.length,
         codigos: reservas.map((reserva) => reserva.codigo),
         distribucion: reservas.map((reserva) => reserva.cantidadPersonas),
-        precioTotal: reservas.reduce(
-          (total, reserva) => total + Number(reserva.precioTotal),
-          0,
-        ),
+        precioTotal,
         moneda: "HNL",
+        metodoPago: "transferencia",
         datosPago: {
           banco: hotelInfo.pagos.banco,
           titular: hotelInfo.pagos.titular,

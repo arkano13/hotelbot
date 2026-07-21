@@ -11,6 +11,7 @@ import {
 import { obtenerTarifaPorPersonas } from "../tarifas/service.js";
 
 const MINUTOS_EXPIRACION = 30;
+const MINUTOS_EXPIRACION_EFECTIVO = 24 * 60;
 
 async function ejecutarTransaccionSerializable(operacion, intentosMaximos = 3) {
   for (let intento = 1; intento <= intentosMaximos; intento++) {
@@ -79,10 +80,16 @@ function validarDatosReserva({
   fechaEntrada,
   fechaSalida,
   personas,
+  documento,
+  metodoPago,
   telefonoObligatorio = true,
+  documentoObligatorio = true,
+  metodoPagoObligatorio = true,
 }) {
   const nombreLimpio = String(nombre ?? "").trim();
   const telefonoLimpio = String(telefono ?? "").trim();
+  const documentoLimpio = String(documento ?? "").trim();
+  const metodoPagoLimpio = String(metodoPago ?? "").trim().toUpperCase();
   const cantidadPersonas = Number(personas);
 
   if (!nombreLimpio) {
@@ -95,6 +102,20 @@ function validarDatosReserva({
     throw new Error(
       "El teléfono es obligatorio"
     );
+  }
+
+  if (documentoObligatorio && !documentoLimpio) {
+    throw new Error(
+      "El número de identidad es obligatorio"
+    );
+  }
+
+  if (metodoPagoObligatorio || metodoPagoLimpio) {
+    if (!["EFECTIVO", "TRANSFERENCIA"].includes(metodoPagoLimpio)) {
+      throw new Error(
+        'El método de pago debe ser "efectivo" o "transferencia"'
+      );
+    }
   }
 
   if (!fechaEntrada || !fechaSalida) {
@@ -131,6 +152,8 @@ function validarDatosReserva({
   return {
     nombreLimpio,
     telefonoLimpio,
+    documentoLimpio,
+    metodoPagoLimpio,
     cantidadPersonas,
     entrada,
     salida,
@@ -143,11 +166,15 @@ export async function crearReservaTemporal({
   fechaEntrada,
   fechaSalida,
   personas,
+  documento,
+  metodoPago,
   observaciones,
 }) {
   const {
     nombreLimpio,
     telefonoLimpio,
+    documentoLimpio,
+    metodoPagoLimpio: metodo,
     cantidadPersonas,
     entrada,
     salida,
@@ -157,6 +184,8 @@ export async function crearReservaTemporal({
     fechaEntrada,
     fechaSalida,
     personas,
+    documento,
+    metodoPago,
   });
 
   if (cantidadPersonas > 3) {
@@ -202,11 +231,12 @@ export async function crearReservaTemporal({
     await crearOActualizarCliente({
       nombre: nombreLimpio,
       telefono: telefonoLimpio,
+      documento: documentoLimpio,
     });
 
   const expiraEn = new Date(
     Date.now() +
-      MINUTOS_EXPIRACION * 60 * 1000
+      (metodo === "EFECTIVO" ? MINUTOS_EXPIRACION_EFECTIVO : MINUTOS_EXPIRACION) * 60 * 1000
   );
 
   return ejecutarTransaccionSerializable(async (tx) => {
@@ -275,7 +305,8 @@ export async function crearReservaTemporal({
       data: {
         reservaId: reserva.id,
         monto: precioTotal,
-        estado: "NO_GENERADO",
+        proveedor: metodo,
+        estado: metodo === "EFECTIVO" ? "PENDIENTE" : "NO_GENERADO",
       },
     });
 
@@ -296,6 +327,7 @@ export async function crearReservaWalkIn({
   fechaSalida,
   personas,
   habitacionId,
+  documento,
 }) {
   const datos = validarDatosReserva({
     nombre,
@@ -303,10 +335,13 @@ export async function crearReservaWalkIn({
     fechaEntrada,
     fechaSalida,
     personas,
+    documento,
     telefonoObligatorio: false,
+    documentoObligatorio: false,
+    metodoPagoObligatorio: false,
   });
 
-  const { nombreLimpio, telefonoLimpio, cantidadPersonas, entrada, salida } = datos;
+  const { nombreLimpio, telefonoLimpio, documentoLimpio, cantidadPersonas, entrada, salida } = datos;
   if (cantidadPersonas > 3) {
     throw new Error("Para más de 3 personas se necesitan varias habitaciones.");
   }
@@ -346,8 +381,8 @@ export async function crearReservaWalkIn({
   const precioTotal = precioPorNoche * cantidadNoches;
 
   const cliente = telefonoLimpio
-    ? await crearOActualizarCliente({ nombre: nombreLimpio, telefono: telefonoLimpio })
-    : await prisma.cliente.create({ data: { nombre: nombreLimpio, telefono: null } });
+    ? await crearOActualizarCliente({ nombre: nombreLimpio, telefono: telefonoLimpio, documento: documentoLimpio })
+    : await prisma.cliente.create({ data: { nombre: nombreLimpio, telefono: null, documento: documentoLimpio || null } });
 
   return ejecutarTransaccionSerializable(async (tx) => {
     const conflictoDentroDeTransaccion = await tx.reserva.findFirst({
@@ -409,10 +444,14 @@ export async function crearReservasMultiples({
   fechaEntrada,
   fechaSalida,
   personas,
+  documento,
+  metodoPago,
 }) {
   const {
     nombreLimpio,
     telefonoLimpio,
+    documentoLimpio,
+    metodoPagoLimpio: metodo,
     cantidadPersonas,
     entrada,
     salida,
@@ -422,11 +461,13 @@ export async function crearReservasMultiples({
     fechaEntrada,
     fechaSalida,
     personas,
+    documento,
+    metodoPago,
   });
 
-  if (cantidadPersonas < 4) {
+  if (cantidadPersonas < 2) {
     throw new Error(
-      "Las reservas múltiples son para grupos de 4 personas o más"
+      "Las reservas múltiples son para grupos de 2 personas o más"
     );
   }
 
@@ -455,11 +496,16 @@ export async function crearReservasMultiples({
     await crearOActualizarCliente({
       nombre: nombreLimpio,
       telefono: telefonoLimpio,
+      documento: documentoLimpio,
     });
 
   const expiraEn = new Date(
     Date.now() +
-      MINUTOS_EXPIRACION * 60 * 1000
+      (metodo === "EFECTIVO"
+        ? MINUTOS_EXPIRACION_EFECTIVO
+        : MINUTOS_EXPIRACION) *
+        60 *
+        1000
   );
 
   return ejecutarTransaccionSerializable(async (tx) => {
@@ -551,7 +597,8 @@ export async function crearReservasMultiples({
         data: {
           reservaId: reserva.id,
           monto: precioTotal,
-          estado: "NO_GENERADO",
+          proveedor: metodo,
+          estado: metodo === "EFECTIVO" ? "PENDIENTE" : "NO_GENERADO",
         },
       });
 
@@ -566,13 +613,6 @@ export async function crearReservasMultiples({
   });
 }
 
-function numerosPorPersonas(personas) {
-  if (Number(personas) === 1) return ["1", "2", "3"];
-  if (Number(personas) === 2) return ["4", "5", "6"];
-  if (Number(personas) === 3) return ["7", "8"];
-  return [];
-}
-
 export async function listarHabitacionesDisponiblesWalkIn({ fechaEntrada, fechaSalida, personas }) {
   const entrada = crearFecha(fechaEntrada);
   const salida = crearFecha(fechaSalida);
@@ -585,14 +625,11 @@ export async function listarHabitacionesDisponiblesWalkIn({ fechaEntrada, fechaS
     select: { habitacionId: true },
   });
   const ocupadasIds = new Set(ocupadas.map((reserva) => reserva.habitacionId));
-  const numeros = numerosPorPersonas(personas);
   const habitaciones = await prisma.habitacion.findMany({
     where: { activa: true, estado: "DISPONIBLE", capacidad: { gte: Number(personas) } },
     orderBy: { numero: "asc" },
   });
-  return habitaciones.filter((habitacion) =>
-    numeros.includes(String(habitacion.numero)) && !ocupadasIds.has(habitacion.id)
-  );
+  return habitaciones.filter((habitacion) => !ocupadasIds.has(habitacion.id));
 }
 
 export async function listarReservasParaCheckIn() {
@@ -631,7 +668,7 @@ export async function listarReservasParaCheckout() {
 export async function listarReservasParaCancelar() {
   return prisma.reserva.findMany({
     where: {
-      estado: "CONFIRMADA",
+      estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA"] },
     },
     orderBy: { fechaEntrada: "asc" },
     include: {
@@ -656,7 +693,7 @@ export async function cancelarReservaPorId(reservaId) {
     throw new Error("Reserva no encontrada.");
   }
 
-  if (reserva.estado !== "CONFIRMADA") {
+  if (!["PENDIENTE_PAGO", "CONFIRMADA"].includes(reserva.estado)) {
     throw new Error(`La reserva está en estado ${reserva.estado} y no se puede cancelar desde este menú.`);
   }
 
@@ -692,18 +729,33 @@ export async function registrarCheckInPorHabitacion(habitacionId) {
   const reserva = await prisma.reserva.findFirst({
     where: {
       habitacionId,
-      estado: "CONFIRMADA",
+      OR: [
+        { estado: "CONFIRMADA" },
+        // Reserva en efectivo: nunca pasó por aprobación de comprobante,
+        // se confirma en este momento al hacer check-in (se asume que se
+        // cobró en recepción).
+        { estado: "PENDIENTE_PAGO", pago: { proveedor: "EFECTIVO" } },
+      ],
       fechaEntrada: { lt: fin },
       fechaSalida: { gt: inicio },
     },
     orderBy: { fechaEntrada: "asc" },
-    include: { habitacion: true, cliente: true },
+    include: { habitacion: true, cliente: true, pago: true },
   });
   if (!reserva) throw new Error("No hay reserva confirmada para esa habitación.");
 
+  const esEfectivoPendiente =
+    reserva.estado === "PENDIENTE_PAGO" && reserva.pago?.proveedor === "EFECTIVO";
+
   const reservaActualizada = await prisma.reserva.update({
     where: { id: reserva.id },
-    data: { estado: "CHECK_IN" },
+    data: {
+      estado: "CHECK_IN",
+      expiraEn: null,
+      ...(esEfectivoPendiente
+        ? { pago: { update: { estado: "APROBADO", fechaPago: new Date() } } }
+        : {}),
+    },
     include: { habitacion: true, cliente: true },
   });
 

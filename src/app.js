@@ -8,6 +8,7 @@ import clientesRoutes from "./clientes/routes.js";
 import disponibilidadRoutes from "./disponibilidad/routes.js";
 import reservasRoutes from "./reservas/routes.js";
 import pagosRoutes from "./pagos/routes.js";
+import adminRoutes from "./admin/routes.js";
 
 import { requireApiKey } from "./lib/auth.js";
 import { apiLimiter } from "./lib/rateLimit.js";
@@ -50,6 +51,7 @@ app.use("/api/clientes", clientesRoutes);
 app.use("/api/disponibilidad", disponibilidadRoutes);
 app.use("/api/reservas", reservasRoutes);
 app.use("/api/pagos", pagosRoutes);
+app.use("/api/admin", adminRoutes);
 
 
 app.use((req, res) => {

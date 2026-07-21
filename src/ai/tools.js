@@ -42,7 +42,7 @@ export const hotelTools = [
       {
         name: "crear_reserva",
         description:
-          "Crea una reserva temporal únicamente cuando el cliente ya confirmó que desea reservar y proporcionó su nombre completo.",
+          "Crea una reserva temporal únicamente cuando el cliente ya confirmó que desea reservar, proporcionó su nombre completo, su número de identidad (DNI/tarjeta de identidad) y eligió método de pago (efectivo o transferencia).",
         parameters: {
           type: "OBJECT",
           properties: {
@@ -51,8 +51,19 @@ export const hotelTools = [
               description:
                 "Nombre completo del cliente que confirmó la reserva.",
             },
+            documento: {
+              type: "STRING",
+              description:
+                "Número de identidad (DNI/tarjeta de identidad) del cliente. Es obligatorio para registrar la reserva.",
+            },
+            metodo_pago: {
+              type: "STRING",
+              enum: ["efectivo", "transferencia"],
+              description:
+                "Método de pago elegido por el cliente: 'efectivo' (paga al llegar, tiene 24 horas) o 'transferencia' (debe enviar comprobante).",
+            },
           },
-          required: ["nombre"],
+          required: ["nombre", "documento", "metodo_pago"],
         },
       },
       {
@@ -65,24 +76,9 @@ export const hotelTools = [
         },
       },
       {
-        name: "enviar_fotos",
-        description:
-          "Envía fotografías al cliente únicamente cuando las solicita. Usa tipo 'habitacion' para fotos de los cuartos, o 'general' para fotos del hotel en general (fachada, recepción, áreas comunes).",
-        parameters: {
-          type: "OBJECT",
-          properties: {
-            tipo: {
-              type: "STRING",
-              description:
-                "'habitacion' o 'general'. Si el cliente no especifica, usa 'habitacion'.",
-            },
-          },
-        },
-      },
-      {
         name: "buscar_disponibilidad_multiple",
         description:
-          "Busca varias habitaciones para grupos de 4 personas o más.",
+          "Busca varias habitaciones para un grupo, repartiendo personas entre ellas. Úsala para grupos de 4 o más personas, o como respaldo cuando 2 o 3 personas no caben en una sola habitación (buscar_disponibilidad no encontró nada) y el cliente acepta repartirse en varias habitaciones.",
         parameters: {
           type: "OBJECT",
           properties: {
@@ -96,7 +92,7 @@ export const hotelTools = [
             },
             personas: {
               type: "NUMBER",
-              description: "Cantidad total de personas, mínimo 4.",
+              description: "Cantidad total de personas, mínimo 2.",
             },
           },
           required: ["fechaEntrada", "fechaSalida", "personas"],
@@ -105,7 +101,7 @@ export const hotelTools = [
       {
   name: "crear_reservas_multiples",
   description:
-    "Crea varias reservas para un grupo de 4 personas o más, después de confirmar disponibilidad, recibir confirmación y obtener nombre y apellido.",
+    "Crea varias reservas para repartir a un grupo en distintas habitaciones (grupos de 4+, o de 2-3 personas cuando no cupieron en una sola habitación), después de confirmar disponibilidad, recibir confirmación, obtener nombre, apellido, número de identidad y método de pago.",
   parameters: {
     type: "OBJECT",
     properties: {
@@ -113,8 +109,19 @@ export const hotelTools = [
         type: "STRING",
         description: "Nombre y apellido del cliente.",
       },
+      documento: {
+        type: "STRING",
+        description:
+          "Número de identidad (DNI/tarjeta de identidad) del cliente responsable del grupo. Es obligatorio.",
+      },
+      metodo_pago: {
+        type: "STRING",
+        enum: ["efectivo", "transferencia"],
+        description:
+          "Método de pago elegido: 'efectivo' (paga al llegar, tiene 24 horas) o 'transferencia' (debe enviar comprobante).",
+      },
     },
-    required: ["nombre"],
+    required: ["nombre", "documento", "metodo_pago"],
   },
 },
       {

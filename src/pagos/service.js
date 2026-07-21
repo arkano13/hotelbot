@@ -503,3 +503,22 @@ export async function actualizarEstadoPago(id, estado) {
     };
   });
 }
+
+export async function listarPagosPendientes() {
+  return prisma.pago.findMany({
+    where: {
+      estado: "PENDIENTE",
+    },
+    include: {
+      reserva: {
+        include: {
+          cliente: true,
+          habitacion: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+}

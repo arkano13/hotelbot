@@ -66,7 +66,8 @@ export const hotelInfo = {
     salidaTardia:
       "La salida tardía depende de disponibilidad y puede tener un costo adicional.",
     mascotas: "No se permiten mascotas.",
-    fumado: "Está prohibido fumar dentro de las habitaciones.",
+    fumado:
+      "Está prohibido fumar dentro de las habitaciones. Se permite fumar en las áreas comunes al aire libre.",
     fiestas: "No se permiten fiestas ni eventos dentro de las habitaciones.",
     visitas:
       "Las visitas deben registrarse en recepción y no pueden quedarse a dormir.",

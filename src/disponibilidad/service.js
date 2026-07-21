@@ -68,29 +68,6 @@ export async function consultarDisponibilidad({
   };
 }
 
-function calcularDistribucion(personas) {
-  const cantidad = Number(personas);
-
-  if (!Number.isInteger(cantidad) || cantidad < 4) {
-    throw new Error("Esta consulta es para grupos de 4 personas o más");
-  }
-
-  const distribucion = [];
-  let restantes = cantidad;
-
-  while (restantes > 0) {
-    if (restantes >= 3) {
-      distribucion.push(3);
-      restantes -= 3;
-    } else {
-      distribucion.push(restantes);
-      restantes = 0;
-    }
-  }
-
-  return distribucion;
-}
-
 export async function consultarDisponibilidadMultiple({
   fechaEntrada,
   fechaSalida,
@@ -113,9 +90,9 @@ export async function consultarDisponibilidadMultiple({
     );
   }
 
-  const distribucion = calcularDistribucion(
-    cantidadPersonas
-  );
+  if (!Number.isInteger(cantidadPersonas) || cantidadPersonas < 4) {
+    throw new Error("Esta consulta es para grupos de 4 personas o más");
+  }
 
   const habitacionesDisponibles =
     await prisma.habitacion.findMany({
@@ -145,40 +122,49 @@ export async function consultarDisponibilidadMultiple({
       },
     });
 
+  // Empaquetado dinámico: se llenan las habitaciones realmente libres ese
+  // rango de fechas, de mayor a menor capacidad, con hasta 3 personas por
+  // habitación (límite de las tarifas). Así, si un día no hay habitación
+  // de capacidad 3 libre pero sí hay de 2 y de 1, el sistema las combina
+  // (ej. 2+1) en vez de fallar por no encontrar una habitación "exacta".
+  const ordenadasPorCapacidad = [...habitacionesDisponibles].sort(
+    (a, b) => b.capacidad - a.capacidad
+  );
+
   const seleccionadas = [];
-  const usadas = new Set();
+  let restantes = cantidadPersonas;
 
-  for (const capacidadNecesaria of distribucion) {
-    const habitacion = habitacionesDisponibles.find(
-      (item) =>
-        !usadas.has(item.id) &&
-        item.capacidad >= capacidadNecesaria
-    );
+  for (const habitacion of ordenadasPorCapacidad) {
+    if (restantes <= 0) break;
 
-    if (!habitacion) {
-      return {
-        disponible: false,
-        personas: cantidadPersonas,
-        distribucion,
-        totalHabitaciones: distribucion.length,
-        habitaciones: [],
-      };
-    }
+    const capacidadAsignada = Math.min(habitacion.capacidad, restantes, 3);
 
-    usadas.add(habitacion.id);
+    if (capacidadAsignada < 1) continue;
 
     seleccionadas.push({
       id: habitacion.id,
       numero: habitacion.numero,
-      capacidadAsignada: capacidadNecesaria,
+      capacidadAsignada,
       capacidadMaxima: habitacion.capacidad,
     });
+
+    restantes -= capacidadAsignada;
+  }
+
+  if (restantes > 0) {
+    return {
+      disponible: false,
+      personas: cantidadPersonas,
+      distribucion: [],
+      totalHabitaciones: 0,
+      habitaciones: [],
+    };
   }
 
   return {
     disponible: true,
     personas: cantidadPersonas,
-    distribucion,
+    distribucion: seleccionadas.map((h) => h.capacidadAsignada),
     totalHabitaciones: seleccionadas.length,
     habitaciones: seleccionadas,
   };

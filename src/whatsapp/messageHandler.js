@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import pino from "pino";
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
 
@@ -428,10 +429,32 @@ async function procesarFlujoJefe({ socket, jid, texto }) {
 
   if (flujo.tipo === "ESCALAR_CONFIRMACION") {
     const opcion = texto.trim().toLowerCase();
+    const escalacionActual = flujo.cola[0];
+
+    async function avanzarCola() {
+      flujo.cola.shift();
+
+      if (flujo.cola.length === 0) {
+        flujosJefe.delete(jid);
+        return;
+      }
+
+      const siguiente = flujo.cola[0];
+
+      await socket.sendMessage(jid, {
+        text:
+          `🙋 Sigue otro cliente esperando atención humana` +
+          `${siguiente.codigoConversacion ? ` (${siguiente.codigoConversacion})` : ""}\n` +
+          `Cliente: ${siguiente.telefonoCliente}\n` +
+          `Motivo: ${siguiente.motivo}\n\n` +
+          `1. Aceptar (tomo la conversación)\n` +
+          `2. Rechazar (que el bot siga atendiendo)`,
+      });
+    }
 
     if (["1", "aceptar"].includes(opcion)) {
       try {
-        await cambiarModoConversacion(flujo.conversationId, "HUMANO");
+        await cambiarModoConversacion(escalacionActual.conversationId, "HUMANO");
 
         await socket.sendMessage(jid, {
           text: "✅ Tomaste la conversación. El bot dejó de responder ahí, ya puedes escribirle directo al cliente.",
@@ -442,7 +465,7 @@ async function procesarFlujoJefe({ socket, jid, texto }) {
         });
       }
 
-      flujosJefe.delete(jid);
+      await avanzarCola();
       return true;
     }
 
@@ -451,7 +474,7 @@ async function procesarFlujoJefe({ socket, jid, texto }) {
         text: "❌ Está bien, el bot sigue atendiendo esa conversación.",
       });
 
-      flujosJefe.delete(jid);
+      await avanzarCola();
       return true;
     }
 
@@ -788,7 +811,7 @@ async function procesarComprobante({ socket, jid, telefono, message }) {
 
   await fs.promises.mkdir(carpeta, { recursive: true });
 
-  const nombreArchivo = `${Date.now()}-${telefono}.${extension}`;
+  const nombreArchivo = `${crypto.randomUUID()}.${extension}`;
 
   const rutaArchivo = path.join(carpeta, nombreArchivo);
 
