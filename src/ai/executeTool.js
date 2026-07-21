@@ -1,4 +1,5 @@
 import { hotelInfo } from "../config/hotelInfo.js";
+import { enviarNotificacionATodos } from "../notificaciones/service.js";
 
 import { obtenerTarifaPorPersonas } from "../tarifas/service.js";
 import {
@@ -12,7 +13,6 @@ import {
   obtenerReservaPorCodigo,
 } from "../reservas/service.js";
 
-import { flujosJefe } from "../lib/flujosJefe.js";
 
 import {
   actualizarEstadoConversacion,
@@ -232,71 +232,28 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
     }
 
     case "escalar_a_humano": {
-      if (!socket) {
-        throw new Error("No se pudo acceder a WhatsApp");
-      }
-
       const motivo =
         String(argumentos?.motivo ?? "").trim() ||
         "El cliente necesita atención humana.";
 
-      const ownerPhone = String(process.env.OWNER_PHONE || "")
-        .replace(/\D/g, "")
-        .trim();
-
-      if (!ownerPhone) {
-        throw new Error("No hay un número de dueño configurado");
-      }
-
-      let codigoConversacion = null;
-
       if (conversationId) {
-        try {
-          const conversacionInfo = await obtenerConversacionPorId(
-            conversationId
-          );
-          codigoConversacion = conversacionInfo?.codigo ?? null;
-        } catch {
-          codigoConversacion = null;
-        }
-      }
-
-      const ownerJid = `${ownerPhone}@s.whatsapp.net`;
-
-      const nuevaEscalacion = {
-        conversationId,
-        telefonoCliente: telefono,
-        codigoConversacion,
-        motivo,
-      };
-
-      const flujoActual = flujosJefe.get(ownerJid);
-
-      if (flujoActual?.tipo === "ESCALAR_CONFIRMACION") {
-        // Ya hay una escalación pendiente de respuesta: se encola en vez de
-        // pisarla, para no perder la solicitud de este cliente.
-        flujoActual.cola.push(nuevaEscalacion);
-      } else {
-        flujosJefe.set(ownerJid, {
-          tipo: "ESCALAR_CONFIRMACION",
-          cola: [nuevaEscalacion],
+        await actualizarEstadoConversacion(conversationId, {
+          necesitaHumano: true,
+          motivoEscalar: motivo,
+          escaladaEn: new Date(),
         });
       }
 
-      await socket.sendMessage(ownerJid, {
-        text:
-          `🙋 Un cliente necesita atención humana` +
-          `${codigoConversacion ? ` (${codigoConversacion})` : ""}\n` +
-          `Cliente: ${telefono}\n` +
-          `Motivo: ${motivo}\n\n` +
-          `1. Aceptar (tomo la conversación)\n` +
-          `2. Rechazar (que el bot siga atendiendo)`,
+      await enviarNotificacionATodos({
+        titulo: "🙋 Cliente necesita atención",
+        cuerpo: `${telefono ?? "Un cliente"} · ${motivo}`,
+        datos: { tipo: "escalacion_pendiente" },
       });
 
       return {
         escalado: true,
         mensaje:
-          "Se notificó al jefe. Avísale al cliente que en un momento lo atienden, con paciencia y buena actitud sin importar cómo se haya comportado.",
+          "Quedó registrado que este cliente necesita atención humana. Avísale que en un momento lo atienden, con paciencia y buena actitud sin importar cómo se haya comportado.",
       };
     }
 

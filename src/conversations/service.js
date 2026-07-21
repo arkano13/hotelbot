@@ -206,6 +206,8 @@ export async function cambiarModoConversacion(
     data: {
       mode: modo,
       status: "ACTIVA",
+      necesitaHumano: false,
+      motivoEscalar: null,
     },
   });
 }
@@ -219,6 +221,28 @@ export async function listarConversacionesActivas() {
       updatedAt: "desc",
     },
     take: 20,
+  });
+}
+
+export async function listarEscalacionesPendientes() {
+  return prisma.conversation.findMany({
+    where: {
+      necesitaHumano: true,
+    },
+    orderBy: {
+      escaladaEn: "asc",
+    },
+  });
+}
+
+export async function listarConversacionesEnModoHumano() {
+  return prisma.conversation.findMany({
+    where: {
+      mode: "HUMANO",
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
   });
 }
 

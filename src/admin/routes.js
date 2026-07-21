@@ -1,10 +1,11 @@
-    import { Router } from "express";
+import { Router } from "express";
 import {
   habitaciones,
   reservasParaCheckIn,
   reservasParaCheckout,
   reservasParaCancelar,
   hacerCheckIn,
+  alternativasCheckIn,
   hacerCheckout,
   cancelarReserva,
   habitacionesMantenimiento,
@@ -13,7 +14,16 @@ import {
   aprobarPago,
   rechazarPago,
   habitacionesDisponiblesWalkIn,
+  habitacionesPorCapacidadConEstado,
   crearWalkIn,
+  estadoBot,
+  cambiarEstadoBot,
+  escalacionesPendientes,
+  aceptarEscalacion,
+  rechazarEscalacion,
+  conversacionesEnModoHumano,
+  devolverABot,
+  registrarDispositivoPush,
 } from "./controller.js";
 
 const router = Router();
@@ -26,6 +36,7 @@ router.get("/reservas/checkin", reservasParaCheckIn);
 router.get("/reservas/checkout", reservasParaCheckout);
 router.get("/reservas/cancelar", reservasParaCancelar);
 router.post("/checkin/:habitacionId", hacerCheckIn);
+router.get("/checkin/:habitacionId/alternativas", alternativasCheckIn);
 router.post("/checkout/:habitacionId", hacerCheckout);
 router.post("/cancelar/:reservaId", cancelarReserva);
 
@@ -40,6 +51,23 @@ router.post("/pagos/:codigo/rechazar", rechazarPago);
 
 // Walk-in
 router.get("/walkin/disponibles", habitacionesDisponiblesWalkIn);
+router.get("/walkin/habitaciones", habitacionesPorCapacidadConEstado);
 router.post("/walkin", crearWalkIn);
+
+// Encendido/apagado del bot
+router.get("/bot-estado", estadoBot);
+router.post("/bot-estado", cambiarEstadoBot);
+
+// Escalar a humano
+router.get("/escalaciones", escalacionesPendientes);
+router.post("/escalaciones/:conversationId/aceptar", aceptarEscalacion);
+router.post("/escalaciones/:conversationId/rechazar", rechazarEscalacion);
+
+// Conversaciones actualmente en modo humano (para poder devolverlas al bot)
+router.get("/conversaciones-humano", conversacionesEnModoHumano);
+router.post("/conversaciones-humano/:conversationId/devolver-a-bot", devolverABot);
+
+// Notificaciones push
+router.post("/dispositivos", registrarDispositivoPush);
 
 export default router;

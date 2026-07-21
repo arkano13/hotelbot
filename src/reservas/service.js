@@ -328,7 +328,14 @@ export async function crearReservaWalkIn({
   personas,
   habitacionId,
   documento,
+  metodoPago,
 }) {
+  const metodo = String(metodoPago ?? "EFECTIVO").trim().toUpperCase();
+
+  if (!["EFECTIVO", "TRANSFERENCIA", "TARJETA"].includes(metodo)) {
+    throw new Error('El método de pago debe ser "efectivo", "transferencia" o "tarjeta"');
+  }
+
   const datos = validarDatosReserva({
     nombre,
     telefono,
@@ -413,14 +420,14 @@ export async function crearReservaWalkIn({
         precioTotal,
         estado: "CHECK_IN",
         expiraEn: null,
-        observaciones: "Walk-in, pago en efectivo",
+        observaciones: `Walk-in, pago en ${metodo.toLowerCase()}`,
       },
     });
     const pago = await tx.pago.create({
       data: {
         reservaId: reserva.id,
         monto: precioTotal,
-        proveedor: "EFECTIVO",
+        proveedor: metodo,
         estado: "APROBADO",
         fechaPago: new Date(),
       },
@@ -640,12 +647,12 @@ export async function listarReservasParaCheckIn() {
 
   const reservas = await prisma.reserva.findMany({
     where: {
-      estado: "CONFIRMADA",
+      estado: { in: ["CONFIRMADA", "PENDIENTE_PAGO"] },
       fechaEntrada: { lt: fin },
       fechaSalida: { gt: inicio },
     },
     orderBy: { fechaEntrada: "asc" },
-    include: { habitacion: true, cliente: true },
+    include: { habitacion: true, cliente: true, pago: true },
   });
 
   return Array.from(
@@ -720,7 +727,10 @@ export async function cancelarReservaPorId(reservaId) {
   return reservaActualizada;
 }
 
-export async function registrarCheckInPorHabitacion(habitacionId) {
+// Para el modal de "Llegó" en la app: además de la habitación que ya tenía
+// reservada, muestra qué otras habitaciones de la misma capacidad están
+// libres AHORA, por si se quiere reasignar al momento de la entrada.
+export async function listarAlternativasParaCheckIn(habitacionId) {
   const inicio = new Date();
   inicio.setHours(0, 0, 0, 0);
   const fin = new Date(inicio);
@@ -729,13 +739,60 @@ export async function registrarCheckInPorHabitacion(habitacionId) {
   const reserva = await prisma.reserva.findFirst({
     where: {
       habitacionId,
-      OR: [
-        { estado: "CONFIRMADA" },
-        // Reserva en efectivo: nunca pasó por aprobación de comprobante,
-        // se confirma en este momento al hacer check-in (se asume que se
-        // cobró en recepción).
-        { estado: "PENDIENTE_PAGO", pago: { proveedor: "EFECTIVO" } },
-      ],
+      estado: { in: ["CONFIRMADA", "PENDIENTE_PAGO"] },
+      fechaEntrada: { lt: fin },
+      fechaSalida: { gt: inicio },
+    },
+    orderBy: { fechaEntrada: "asc" },
+  });
+
+  if (!reserva) throw new Error("No hay reserva confirmada para esa habitación.");
+
+  const habitaciones = await prisma.habitacion.findMany({
+    where: {
+      activa: true,
+      estado: { not: "MANTENIMIENTO" },
+      capacidad: { gte: reserva.cantidadPersonas },
+    },
+    orderBy: { numero: "asc" },
+  });
+
+  const ocupadas = await prisma.reserva.findMany({
+    where: {
+      id: { not: reserva.id },
+      habitacionId: { in: habitaciones.map((h) => h.id) },
+      estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+      fechaEntrada: { lt: reserva.fechaSalida },
+      fechaSalida: { gt: reserva.fechaEntrada },
+    },
+    select: { habitacionId: true },
+  });
+  const ocupadasIds = new Set(ocupadas.map((r) => r.habitacionId));
+
+  return habitaciones
+    .filter((h) => !ocupadasIds.has(h.id))
+    .map((h) => ({
+      id: h.id,
+      numero: h.numero,
+      capacidad: h.capacidad,
+      esLaOriginal: h.id === habitacionId,
+    }));
+}
+
+export async function registrarCheckInPorHabitacion(
+  habitacionId,
+  metodoPago,
+  nuevaHabitacionId
+) {
+  const inicio = new Date();
+  inicio.setHours(0, 0, 0, 0);
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + 1);
+
+  const reserva = await prisma.reserva.findFirst({
+    where: {
+      habitacionId,
+      estado: { in: ["CONFIRMADA", "PENDIENTE_PAGO"] },
       fechaEntrada: { lt: fin },
       fechaSalida: { gt: inicio },
     },
@@ -744,16 +801,65 @@ export async function registrarCheckInPorHabitacion(habitacionId) {
   });
   if (!reserva) throw new Error("No hay reserva confirmada para esa habitación.");
 
-  const esEfectivoPendiente =
-    reserva.estado === "PENDIENTE_PAGO" && reserva.pago?.proveedor === "EFECTIVO";
+  const pendienteDePago = reserva.estado === "PENDIENTE_PAGO";
+
+  let metodo = null;
+  if (pendienteDePago) {
+    metodo = String(metodoPago ?? "").trim().toUpperCase();
+    if (!["EFECTIVO", "TRANSFERENCIA", "TARJETA"].includes(metodo)) {
+      throw new Error('Indica cómo pagó: "efectivo", "transferencia" o "tarjeta"');
+    }
+  }
+
+  let habitacionFinalId = reserva.habitacionId;
+
+  if (nuevaHabitacionId && nuevaHabitacionId !== reserva.habitacionId) {
+    const nuevaHabitacion = await prisma.habitacion.findFirst({
+      where: {
+        id: nuevaHabitacionId,
+        activa: true,
+        estado: { not: "MANTENIMIENTO" },
+        capacidad: { gte: reserva.cantidadPersonas },
+      },
+    });
+
+    if (!nuevaHabitacion) {
+      throw new Error("La habitación elegida no existe o no tiene capacidad suficiente.");
+    }
+
+    const conflicto = await prisma.reserva.findFirst({
+      where: {
+        id: { not: reserva.id },
+        habitacionId: nuevaHabitacionId,
+        estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+        fechaEntrada: { lt: reserva.fechaSalida },
+        fechaSalida: { gt: reserva.fechaEntrada },
+      },
+    });
+
+    if (conflicto) {
+      throw new Error("Esa habitación ya no está disponible para estas fechas.");
+    }
+
+    habitacionFinalId = nuevaHabitacionId;
+  }
 
   const reservaActualizada = await prisma.reserva.update({
     where: { id: reserva.id },
     data: {
+      habitacionId: habitacionFinalId,
       estado: "CHECK_IN",
       expiraEn: null,
-      ...(esEfectivoPendiente
-        ? { pago: { update: { estado: "APROBADO", fechaPago: new Date() } } }
+      ...(pendienteDePago
+        ? {
+            pago: {
+              update: {
+                estado: "APROBADO",
+                proveedor: metodo,
+                fechaPago: new Date(),
+              },
+            },
+          }
         : {}),
     },
     include: { habitacion: true, cliente: true },

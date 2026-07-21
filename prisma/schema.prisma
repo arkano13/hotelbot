@@ -189,6 +189,10 @@ model Conversation {
   reservaId              String?
   reservaIds             Json?
 
+  necesitaHumano         Boolean            @default(false)
+  motivoEscalar          String?
+  escaladaEn             DateTime?
+
   ultimaDisponibilidadAt DateTime?
 
   createdAt              DateTime           @default(now())
@@ -199,6 +203,7 @@ model Conversation {
   @@index([status])
   @@index([updatedAt])
   @@index([mode])
+  @@index([necesitaHumano])
 }
 model Message {
   id String @id @default(uuid())
@@ -235,5 +240,26 @@ model Auditoria {
   @@index([entidad, entidadId])
   @@index([createdAt])
   @@map("auditoria")
+}
+
+// Una sola fila (id fijo "global") que controla si el bot responde o no.
+// Se apaga/enciende desde la app o el menú del dueño.
+model ConfiguracionBot {
+  id        String   @id @default("global")
+  activo    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+
+  @@map("configuracion_bot")
+}
+
+// Tokens de push de los celulares donde está instalada la app del dueño.
+// Puede haber más de uno (varios empleados con la app).
+model DispositivoNotificacion {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("dispositivos_notificacion")
 }
 

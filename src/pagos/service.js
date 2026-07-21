@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../auditoria/service.js";
+import { enviarNotificacionATodos } from "../notificaciones/service.js";
 
 const ESTADOS_VALIDOS = [
   "NO_GENERADO",
@@ -244,6 +245,18 @@ export async function registrarComprobantes({ reservaIds, comprobanteUrl }) {
         }),
       );
     }
+
+    return pagos;
+  }).then(async (pagos) => {
+    const primero = pagos[0]?.reserva;
+    await enviarNotificacionATodos({
+      titulo: "💳 Nuevo comprobante",
+      cuerpo:
+        pagos.length > 1
+          ? `${primero?.cliente?.nombre ?? "Un cliente"} envió comprobante para ${pagos.length} habitaciones`
+          : `${primero?.cliente?.nombre ?? "Un cliente"} · Hab. ${primero?.habitacion?.numero ?? ""}`,
+      datos: { tipo: "pago_pendiente" },
+    });
 
     return pagos;
   });
@@ -508,6 +521,7 @@ export async function listarPagosPendientes() {
   return prisma.pago.findMany({
     where: {
       estado: "PENDIENTE",
+      comprobanteUrl: { not: null },
     },
     include: {
       reserva: {
