@@ -171,7 +171,10 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
       await actualizarEstadoConversacion(conversationId, {
         nombreCliente: nombre,
         reservaId: reserva.id,
-        step: metodoPago === "efectivo" ? "COMPLETADO" : "ESPERANDO_PAGO",
+        step:
+          metodoPago === "efectivo" || reserva.requiereAprobacion
+            ? "COMPLETADO"
+            : "ESPERANDO_PAGO",
         ultimaDisponibilidadAt: null,
       });
 
@@ -188,6 +191,7 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
           metodoPago: "efectivo",
           horasLimite: 24,
           estado: reserva.estado,
+          requiereAprobacion: reserva.requiereAprobacion,
         };
       }
 
@@ -203,6 +207,7 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         moneda: "HNL",
         metodoPago: "transferencia",
         estado: reserva.estado,
+        requiereAprobacion: reserva.requiereAprobacion,
         datosPago: {
           banco: hotelInfo.pagos.banco,
           titular: hotelInfo.pagos.titular,

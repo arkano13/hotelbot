@@ -18,4 +18,4 @@ export async function establecerBotActivo(activo) {
     update: { activo: Boolean(activo) },
     create: { id: ID_CONFIGURACION, activo: Boolean(activo) },
   });
-}
+}   

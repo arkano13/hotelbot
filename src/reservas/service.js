@@ -9,6 +9,7 @@ import {
 } from "../disponibilidad/service.js";
 
 import { obtenerTarifaPorPersonas } from "../tarifas/service.js";
+import { enviarNotificacionATodos } from "../notificaciones/service.js";
 
 const MINUTOS_EXPIRACION = 30;
 const MINUTOS_EXPIRACION_EFECTIVO = 24 * 60;
@@ -18,6 +19,8 @@ async function ejecutarTransaccionSerializable(operacion, intentosMaximos = 3) {
     try {
       return await prisma.$transaction(operacion, {
         isolationLevel: "Serializable",
+        maxWait: 10000,
+        timeout: 20000,
       });
     } catch (error) {
       const conflictoConcurrente = error?.code === "P2034";
@@ -295,9 +298,15 @@ export async function crearReservaTemporal({
         estado: "PENDIENTE_PAGO",
         expiraEn,
 
+        requiereAprobacion: disponibilidad.esHabitacionMasGrande,
+
         observaciones: observaciones
           ? String(observaciones).trim()
           : null,
+      },
+      include: {
+        habitacion: true,
+        cliente: true,
       },
     });
 
@@ -317,6 +326,16 @@ export async function crearReservaTemporal({
         disponibilidad.habitacion,
       pago,
     };
+  }).then(async (resultado) => {
+    if (resultado.requiereAprobacion) {
+      await enviarNotificacionATodos({
+        titulo: "🛏️ Necesita tu aprobación",
+        cuerpo: `${resultado.cliente?.nombre ?? "Un cliente"} pidió para ${resultado.cantidadPersonas} y se le asignó la Hab. ${resultado.habitacion?.numero} (capacidad ${resultado.habitacion?.capacidad}) — no había del tamaño exacto.`,
+        datos: { tipo: "aprobacion_habitacion" },
+      });
+    }
+
+    return resultado;
   });
 }
 
@@ -634,7 +653,7 @@ export async function listarHabitacionesDisponiblesWalkIn({ fechaEntrada, fechaS
   const ocupadasIds = new Set(ocupadas.map((reserva) => reserva.habitacionId));
   const habitaciones = await prisma.habitacion.findMany({
     where: { activa: true, estado: "DISPONIBLE", capacidad: { gte: Number(personas) } },
-    orderBy: { numero: "asc" },
+    orderBy: [{ capacidad: "asc" }, { numero: "asc" }],
   });
   return habitaciones.filter((habitacion) => !ocupadasIds.has(habitacion.id));
 }
@@ -754,7 +773,7 @@ export async function listarAlternativasParaCheckIn(habitacionId) {
       estado: { not: "MANTENIMIENTO" },
       capacidad: { gte: reserva.cantidadPersonas },
     },
-    orderBy: { numero: "asc" },
+    orderBy: [{ capacidad: "asc" }, { numero: "asc" }],
   });
 
   const ocupadas = await prisma.reserva.findMany({
@@ -1081,4 +1100,77 @@ export async function alternarMantenimientoHabitacion(habitacionId) {
   });
 
   return habitacionActualizada;
+}
+
+export async function listarReservasQueRequierenAprobacion() {
+  return prisma.reserva.findMany({
+    where: {
+      requiereAprobacion: true,
+      estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA"] },
+    },
+    orderBy: { createdAt: "asc" },
+    include: {
+      habitacion: true,
+      cliente: true,
+      pago: true,
+    },
+  });
+}
+
+export async function aprobarHabitacionMasGrande(reservaId) {
+  const reserva = await prisma.reserva.findUnique({
+    where: { id: reservaId },
+    include: { habitacion: true, cliente: true },
+  });
+
+  if (!reserva) throw new Error("Reserva no encontrada.");
+  if (!reserva.requiereAprobacion) {
+    throw new Error("Esta reserva no tiene ninguna aprobación pendiente.");
+  }
+
+  const actualizada = await prisma.reserva.update({
+    where: { id: reservaId },
+    data: { requiereAprobacion: false },
+    include: { habitacion: true, cliente: true },
+  });
+
+  await registrarAuditoria({
+    accion: "APROBAR_HABITACION_MAS_GRANDE",
+    entidad: "Reserva",
+    entidadId: reserva.id,
+    detalle: `${reserva.codigo} · Hab. ${reserva.habitacion.numero}`,
+  });
+
+  return actualizada;
+}
+
+export async function rechazarHabitacionMasGrande(reservaId) {
+  const reserva = await prisma.reserva.findUnique({
+    where: { id: reservaId },
+    include: { habitacion: true, cliente: true, pago: true },
+  });
+
+  if (!reserva) throw new Error("Reserva no encontrada.");
+  if (!reserva.requiereAprobacion) {
+    throw new Error("Esta reserva no tiene ninguna aprobación pendiente.");
+  }
+
+  const actualizada = await prisma.reserva.update({
+    where: { id: reservaId },
+    data: {
+      estado: "CANCELADA",
+      requiereAprobacion: false,
+      expiraEn: null,
+    },
+    include: { habitacion: true, cliente: true },
+  });
+
+  await registrarAuditoria({
+    accion: "RECHAZAR_HABITACION_MAS_GRANDE",
+    entidad: "Reserva",
+    entidadId: reserva.id,
+    detalle: `${reserva.codigo} · Hab. ${reserva.habitacion.numero}`,
+  });
+
+  return actualizada;
 }

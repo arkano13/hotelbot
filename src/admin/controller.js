@@ -15,7 +15,12 @@ import {
   alternarMantenimientoHabitacion,
   crearReservaWalkIn,
   listarHabitacionesDisponiblesWalkIn,
+  listarReservasQueRequierenAprobacion,
+  aprobarHabitacionMasGrande,
+  rechazarHabitacionMasGrande,
 } from "../reservas/service.js";
+
+import { obtenerWhatsAppSocket } from "../whatsapp/client.js";
 
 import {
   listarPagosPendientes,
@@ -278,6 +283,59 @@ export async function devolverABot(req, res) {
       req.params.conversationId,
       "BOT"
     );
+    return res.json({ success: true, data: datos });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+function notificarClientePorWhatsApp(telefono, texto) {
+  try {
+    const socket = obtenerWhatsAppSocket();
+    if (socket && telefono) {
+      socket
+        .sendMessage(`${telefono}@s.whatsapp.net`, { text: texto })
+        .catch(() => {});
+    }
+  } catch {
+    // El WhatsApp puede no estar conectado en este momento — no es
+    // motivo para fallar la acción del dueño, ya se guardó en la base.
+  }
+}
+
+export async function reservasQueRequierenAprobacion(req, res) {
+  try {
+    const datos = await listarReservasQueRequierenAprobacion();
+    return res.json({ success: true, data: datos });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function aprobarHabitacion(req, res) {
+  try {
+    const datos = await aprobarHabitacionMasGrande(req.params.reservaId);
+
+    notificarClientePorWhatsApp(
+      datos.cliente?.telefono,
+      `Su reserva ${datos.codigo} quedó confirmada en la habitación ${datos.habitacion.numero}. ¡Lo esperamos!`
+    );
+
+    return res.json({ success: true, data: datos });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function rechazarHabitacion(req, res) {
+  try {
+    const datos = await rechazarHabitacionMasGrande(req.params.reservaId);
+
+    notificarClientePorWhatsApp(
+      datos.cliente?.telefono,
+      `Lamentamos informarle que no pudimos confirmar su reserva ${datos.codigo} para esas fechas — ya no contamos con disponibilidad. Si gusta, con gusto le ayudamos a buscar otra fecha.`
+    );
+
     return res.json({ success: true, data: datos });
   } catch (error) {
     return manejarError(res, error);

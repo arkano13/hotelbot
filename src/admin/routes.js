@@ -23,6 +23,9 @@ import {
   rechazarEscalacion,
   conversacionesEnModoHumano,
   devolverABot,
+  reservasQueRequierenAprobacion,
+  aprobarHabitacion,
+  rechazarHabitacion,
   registrarDispositivoPush,
 } from "./controller.js";
 
@@ -66,6 +69,11 @@ router.post("/escalaciones/:conversationId/rechazar", rechazarEscalacion);
 // Conversaciones actualmente en modo humano (para poder devolverlas al bot)
 router.get("/conversaciones-humano", conversacionesEnModoHumano);
 router.post("/conversaciones-humano/:conversationId/devolver-a-bot", devolverABot);
+
+// Aprobación de habitación más grande de la pedida
+router.get("/reservas-requieren-aprobacion", reservasQueRequierenAprobacion);
+router.post("/reservas-requieren-aprobacion/:reservaId/aprobar", aprobarHabitacion);
+router.post("/reservas-requieren-aprobacion/:reservaId/rechazar", rechazarHabitacion);
 
 // Notificaciones push
 router.post("/dispositivos", registrarDispositivoPush);

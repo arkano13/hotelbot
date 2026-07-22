@@ -16,6 +16,8 @@ async function ejecutarTransaccionSerializable(operacion, intentosMaximos = 3) {
     try {
       return await prisma.$transaction(operacion, {
         isolationLevel: "Serializable",
+        maxWait: 10000,
+        timeout: 20000,
       });
     } catch (error) {
       const conflictoConcurrente = error?.code === "P2034";

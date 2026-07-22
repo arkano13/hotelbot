@@ -5,6 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 import { SYSTEM_PROMPT } from "./prompt.js";
 import { hotelTools } from "./tools.js";
 import { ejecutarTool } from "./executeTool.js";
+import { obtenerClientePorTelefono } from "../clientes/service.js";
 
 if (!process.env.GEMINI_API_KEY) {
   throw new Error("GEMINI_API_KEY no está configurada en el archivo .env");
@@ -127,6 +128,15 @@ function obtenerFechaActual() {
   }).format(new Date());
 }
 
+function obtenerHoraActual() {
+  return new Intl.DateTimeFormat("es-HN", {
+    timeZone: "America/Tegucigalpa",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date());
+}
+
 export async function generarRespuestaGemini({
   messages,
   step,
@@ -142,6 +152,28 @@ export async function generarRespuestaGemini({
   }
 
   const fechaActual = obtenerFechaActual();
+  const horaActual = obtenerHoraActual();
+
+  let clienteConocido = null;
+  try {
+    clienteConocido = await obtenerClientePorTelefono(telefono);
+  } catch {
+    // Cliente nuevo, sin reservas anteriores — no hay nada que precargar.
+    clienteConocido = null;
+  }
+
+  const bloqueClienteConocido =
+    clienteConocido && (clienteConocido.nombre || clienteConocido.documento)
+      ? `
+DATOS CONOCIDOS DEL CLIENTE (de una reserva anterior con este mismo número):
+- Nombre: ${clienteConocido.nombre ?? "no registrado"}
+- Número de identidad: ${clienteConocido.documento ?? "no registrado"}
+
+Si ambos datos están registrados, NO se los vuelvas a pedir — úsalos directamente para completar la reserva, salvo que el cliente te diga explícitamente que quiere corregir alguno. Si falta alguno de los dos, pide solo el que falta.
+
+Esto NO incluye el método de pago. El método de pago (efectivo/transferencia) SIEMPRE se pregunta de nuevo en cada reserva nueva, sin importar cómo haya pagado antes — puede ser distinto cada vez. Esto aplica incluso si el cliente ya hizo otra reserva minutos antes en esta MISMA conversación: cada reserva se pregunta su propio método de pago, nunca reutilices el de una reserva anterior (ni de hoy ni de otro día).
+`
+      : "";
 
   const config = {
     systemInstruction: `
@@ -149,8 +181,9 @@ ${SYSTEM_PROMPT}
 
 FECHA ACTUAL:
 - Hoy es ${fechaActual}.
+- Hora actual: ${horaActual} (usa esto para saludar según el momento del día: buenos días, buenas tardes o buenas noches).
 - Zona horaria: America/Tegucigalpa.
-
+${bloqueClienteConocido}
 ESTADO ACTUAL:
 - Paso de reserva: ${step}
 - Teléfono del cliente: ${telefono}
@@ -195,9 +228,9 @@ REGLAS PARA CREAR RESERVAS:
   1. consultar disponibilidad,
   2. mostrar el resumen,
   3. recibir una confirmación clara,
-  4. conocer el nombre completo del cliente.
-- Si el cliente confirma pero no conoces su nombre, pregúntalo.
-- crear_reserva solamente recibe el nombre.
+  4. conocer el nombre completo, el número de identidad y el método de pago del cliente.
+- Si el cliente confirma pero falta alguno de esos 3 datos, pregúntalo. Nombre y documento pueden estar ya cubiertos por DATOS CONOCIDOS DEL CLIENTE si aplica — el método de pago nunca, siempre se pregunta.
+- crear_reserva recibe nombre, documento y metodo_pago.
 - Las fechas y personas se toman del estado guardado en la base de datos.
 - Nunca llames crear_reserva dos veces para la misma reserva.
 - Nunca digas que una reserva fue creada si la herramienta no lo confirmó.

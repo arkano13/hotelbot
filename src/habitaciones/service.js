@@ -106,7 +106,7 @@ export async function listarHabitacionesPorCapacidadConEstado({
       estado: { not: "MANTENIMIENTO" },
       capacidad: { gte: cantidadPersonas },
     },
-    orderBy: { numero: "asc" },
+    orderBy: [{ capacidad: "asc" }, { numero: "asc" }],
   });
 
   const reservasEnRango = await prisma.reserva.findMany({

@@ -110,6 +110,11 @@ model Reserva {
 
   expiraEn DateTime?
 
+  // true cuando se le asignó una habitación de mayor capacidad que la
+  // pedida (porque ya no había del tamaño exacto) y está pendiente de que
+  // el dueño la apruebe o la rechace desde la app.
+  requiereAprobacion Boolean @default(false)
+
   observaciones String?
 
   createdAt DateTime @default(now())
@@ -122,6 +127,7 @@ model Reserva {
   @@index([fechaEntrada, fechaSalida])
   @@index([habitacionId, estado])
   @@index([clienteId])
+  @@index([requiereAprobacion])
   @@map("reservas")
 }
 
