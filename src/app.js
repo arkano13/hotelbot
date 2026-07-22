@@ -1,7 +1,9 @@
 import express from "express";
 import cors from "cors";
+import QRCode from "qrcode";
 
 import { UPLOADS_DIR } from "./lib/paths.js";
+import { obtenerUltimoQR } from "./whatsapp/client.js";
 
 import tarifasRoutes from "./tarifas/routes.js";
 import clientesRoutes from "./clientes/routes.js";
@@ -44,6 +46,39 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+app.get("/qr", async (req, res) => {
+  const qr = obtenerUltimoQR();
+
+  if (!qr) {
+    return res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding: 40px;">
+          <h2>No hay ningún código QR pendiente ahora mismo</h2>
+          <p>Esto pasa si WhatsApp ya está conectado, o si el servidor apenas está arrancando.
+          Recarga esta página en unos segundos si acabas de reiniciar el servicio.</p>
+        </body>
+      </html>
+    `);
+  }
+
+  try {
+    const imagenDataUrl = await QRCode.toDataURL(qr, { width: 320 });
+
+    res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding: 40px;">
+          <h2>Escanea este código con WhatsApp</h2>
+          <p>Configuración → Dispositivos vinculados → Vincular un dispositivo</p>
+          <img src="${imagenDataUrl}" width="320" height="320" />
+          <p style="color: #888; font-size: 13px;">Esta página se actualiza sola si recargas — el código cambia cada cierto tiempo si no lo escaneas a tiempo.</p>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    res.status(500).send("Error generando el código QR: " + error.message);
+  }
+});
+
 app.use("/api", apiLimiter, requireApiKey);
 
 app.use("/api/tarifas", tarifasRoutes);
@@ -61,4 +96,4 @@ app.use((req, res) => {
   });
 });
 
-export { app }; 
+export { app };

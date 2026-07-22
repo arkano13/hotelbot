@@ -20,6 +20,11 @@ const logger = pino({
 let socket = null;
 let iniciando = false;
 let intentosReconexionFallidos = 0;
+let ultimoQR = null;
+
+export function obtenerUltimoQR() {
+  return ultimoQR;
+}
 
 const UMBRAL_ALERTA_RECONEXION = 5;
 
@@ -54,8 +59,10 @@ export async function iniciarWhatsApp() {
         } = update;
 
         if (qr) {
+          ultimoQR = qr;
+
           console.log(
-            "Escanea este código QR con WhatsApp:"
+            "Escanea este código QR con WhatsApp (o entra a /qr en el navegador si no se ve bien aquí):"
           );
 
           qrcode.generate(qr, {
@@ -66,6 +73,7 @@ export async function iniciarWhatsApp() {
         if (connection === "open") {
           iniciando = false;
           intentosReconexionFallidos = 0;
+          ultimoQR = null;
 
           console.log("✅ WhatsApp conectado");
         }
@@ -161,4 +169,4 @@ export function obtenerWhatsAppSocket() {
   }
 
   return socket;
-} 
+}
