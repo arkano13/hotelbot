@@ -20,7 +20,7 @@ import {
   rechazarHabitacionMasGrande,
 } from "../reservas/service.js";
 
-import { obtenerWhatsAppSocket } from "../whatsapp/client.js";
+import { obtenerWhatsAppSocket, reiniciarSesionWhatsApp } from "../whatsapp/client.js";
 
 import {
   listarPagosPendientes,
@@ -337,6 +337,18 @@ export async function rechazarHabitacion(req, res) {
     );
 
     return res.json({ success: true, data: datos });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function reiniciarWhatsApp(req, res) {
+  try {
+    reiniciarSesionWhatsApp();
+    return res.json({
+      success: true,
+      message: "Sesión borrada, generando un código QR nuevo. Entra a /qr en unos segundos.",
+    });
   } catch (error) {
     return manejarError(res, error);
   }

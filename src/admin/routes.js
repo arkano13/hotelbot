@@ -26,6 +26,7 @@ import {
   reservasQueRequierenAprobacion,
   aprobarHabitacion,
   rechazarHabitacion,
+  reiniciarWhatsApp,
   registrarDispositivoPush,
 } from "./controller.js";
 
@@ -74,6 +75,9 @@ router.post("/conversaciones-humano/:conversationId/devolver-a-bot", devolverABo
 router.get("/reservas-requieren-aprobacion", reservasQueRequierenAprobacion);
 router.post("/reservas-requieren-aprobacion/:reservaId/aprobar", aprobarHabitacion);
 router.post("/reservas-requieren-aprobacion/:reservaId/rechazar", rechazarHabitacion);
+
+// Reiniciar sesión de WhatsApp (borra auth_info_baileys y genera QR nuevo)
+router.post("/whatsapp/reiniciar", reiniciarWhatsApp);
 
 // Notificaciones push
 router.post("/dispositivos", registrarDispositivoPush);

@@ -5,6 +5,7 @@ import makeWASocket, {
 
 import qrcode from "qrcode-terminal";
 import pino from "pino";
+import fs from "fs";
 
 import {
   manejarMensajeEntrante,
@@ -24,6 +25,29 @@ let ultimoQR = null;
 
 export function obtenerUltimoQR() {
   return ultimoQR;
+}
+
+export async function reiniciarSesionWhatsApp() {
+  await fs.promises
+    .rm(AUTH_DIR, { recursive: true, force: true })
+    .catch((error) =>
+      console.error("❌ Error borrando la sesión vieja:", error)
+    );
+
+  ultimoQR = null;
+
+  if (socket) {
+    try {
+      socket.end(undefined);
+    } catch {
+      // No pasa nada si ya estaba cerrado.
+    }
+  }
+
+  socket = null;
+  iniciando = false;
+
+  return iniciarWhatsApp();
 }
 
 const UMBRAL_ALERTA_RECONEXION = 5;
@@ -93,14 +117,22 @@ export async function iniciarWhatsApp() {
 
           if (sesionCerrada) {
             console.log(
-              "La sesión fue cerrada. Borra auth_info_baileys y vuelve a escanear."
+              "La sesión fue cerrada. Borrando auth_info_baileys y generando un código QR nuevo automáticamente..."
             );
+
+            await fs.promises
+              .rm(AUTH_DIR, { recursive: true, force: true })
+              .catch((error) =>
+                console.error("❌ Error borrando la sesión vieja:", error)
+              );
 
             enviarAlerta(
               "whatsapp-sesion-cerrada",
               "WhatsApp: sesión cerrada",
-              "La sesión de WhatsApp del bot se cerró. Hay que volver a escanear el código QR desde el servidor para reconectar."
+              "La sesión de WhatsApp del bot se cerró. Se generó un código QR nuevo automáticamente — entra a /qr para escanearlo."
             ).catch(console.error);
+
+            iniciarWhatsApp();
 
             return;
           }
