@@ -73,6 +73,21 @@ export async function reiniciarSesionWhatsApp() {
   return iniciarWhatsApp();
 }
 
+export async function solicitarCodigoVinculacion(telefono) {
+  if (!socket) {
+    throw new Error("El cliente de WhatsApp no está listo todavía. Espera unos segundos e intenta de nuevo.");
+  }
+
+  const numeroLimpio = String(telefono ?? "").replace(/\D/g, "");
+
+  if (!numeroLimpio) {
+    throw new Error("Manda el número en formato internacional, sin +, ej: 50499999999");
+  }
+
+  const codigo = await socket.requestPairingCode(numeroLimpio);
+  return codigo;
+}
+
 const UMBRAL_ALERTA_RECONEXION = 5;
 
 export async function iniciarWhatsApp() {

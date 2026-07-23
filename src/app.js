@@ -3,7 +3,7 @@ import cors from "cors";
 import QRCode from "qrcode";
 
 import { UPLOADS_DIR } from "./lib/paths.js";
-import { obtenerUltimoQR } from "./whatsapp/client.js";
+import { obtenerUltimoQR, solicitarCodigoVinculacion } from "./whatsapp/client.js";
 
 import tarifasRoutes from "./tarifas/routes.js";
 import clientesRoutes from "./clientes/routes.js";
@@ -78,6 +78,44 @@ app.get("/qr", async (req, res) => {
     `);
   } catch (error) {
     res.status(500).send("Error generando el código QR: " + error.message);
+  }
+});
+
+app.get("/pair", async (req, res) => {
+  const telefono = req.query.telefono;
+
+  if (!telefono) {
+    return res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding: 40px;">
+          <h2>Vincular por código</h2>
+          <p>Escribe el número de WhatsApp que va a usar el bot, en formato internacional, sin "+" ni espacios.</p>
+          <form method="get" action="/pair">
+            <input name="telefono" placeholder="50499999999" style="font-size: 18px; padding: 8px; width: 220px;" />
+            <button type="submit" style="font-size: 18px; padding: 8px 16px;">Pedir código</button>
+          </form>
+        </body>
+      </html>
+    `);
+  }
+
+  try {
+    const codigo = await solicitarCodigoVinculacion(telefono);
+
+    res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding: 40px;">
+          <h2>Tu código de vinculación</h2>
+          <p style="font-size: 42px; font-weight: bold; letter-spacing: 4px; color: #2563eb;">${codigo}</p>
+          <p>En el celular con el número <strong>${telefono}</strong>: abre WhatsApp → Configuración → Dispositivos vinculados → Vincular un dispositivo → "Vincular con número de teléfono en su lugar", y escribe este código.</p>
+          <p style="color: #888; font-size: 13px;">Este código vence en unos minutos — si tarda demasiado, recarga esta misma página para pedir uno nuevo.</p>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    res.status(500).send(
+      `<html><body style="font-family: sans-serif; text-align: center; padding: 40px;"><h2>Error</h2><p>${error.message}</p><p><a href="/pair">Volver a intentar</a></p></body></html>`
+    );
   }
 });
 
