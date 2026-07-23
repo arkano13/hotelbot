@@ -19,12 +19,34 @@ const logger = pino({
 });
 
 let socket = null;
+let cerrandoIntencionalmente = false;
 let iniciando = false;
 let intentosReconexionFallidos = 0;
 let ultimoQR = null;
 
 export function obtenerUltimoQR() {
   return ultimoQR;
+}
+
+// Se llama cuando el servidor se está apagando de forma controlada (por
+// ejemplo, en cada despliegue de Railway). Cierra el socket de WhatsApp
+// avisando explícitamente "me estoy desconectando normal", en vez de
+// dejar la conexión colgada — eso evita que WhatsApp lo interprete luego
+// como un conflicto de sesión y fuerce un cierre de sesión real, que
+// obligaría a escanear el QR de nuevo sin necesidad.
+export async function cerrarWhatsAppLimpio() {
+  if (!socket) return;
+
+  cerrandoIntencionalmente = true;
+
+  try {
+    socket.end(undefined);
+  } catch {
+    // No pasa nada si ya estaba cerrado o falla — el proceso va a
+    // terminar de todas formas.
+  }
+
+  socket = null;
 }
 
 export async function reiniciarSesionWhatsApp() {
@@ -104,6 +126,14 @@ export async function iniciarWhatsApp() {
 
         if (connection === "close") {
           iniciando = false;
+
+          if (cerrandoIntencionalmente) {
+            console.log(
+              "🛑 WhatsApp desconectado por apagado normal del servidor — no se toca la sesión guardada."
+            );
+
+            return;
+          }
 
           const statusCode =
             lastDisconnect?.error?.output

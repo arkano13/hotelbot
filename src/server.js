@@ -10,7 +10,7 @@ console.warn = (...args) => {
 
 import { app } from "./app.js";
 import { prisma } from "./lib/prisma.js";
-import { iniciarWhatsApp } from "./whatsapp/client.js";
+import { iniciarWhatsApp, cerrarWhatsAppLimpio } from "./whatsapp/client.js";
 
 import {
   iniciarSchedulerConversaciones,
@@ -90,6 +90,10 @@ async function cerrarServidor(signal) {
   console.log(`\n🛑 Cerrando servidor por ${signal}...`);
 
   detenerSchedulers();
+
+  await cerrarWhatsAppLimpio().catch((error) =>
+    console.error("❌ Error cerrando WhatsApp:", error)
+  );
 
   if (servidor) {
     await new Promise((resolve) => {
