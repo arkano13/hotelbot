@@ -1,10 +1,8 @@
 import { prisma } from "../lib/prisma.js";
+import { obtenerRangoHoyHonduras } from "../lib/fecha.js";
 
 export async function listarHabitacionesConEstado() {
-  const inicio = new Date();
-  inicio.setHours(0, 0, 0, 0);
-  const fin = new Date(inicio);
-  fin.setDate(fin.getDate() + 1);
+  const { inicio, fin } = obtenerRangoHoyHonduras();
 
   const habitaciones = await prisma.habitacion.findMany({
     where: { activa: true },

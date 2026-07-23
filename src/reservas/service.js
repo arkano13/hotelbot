@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../auditoria/service.js";
+import { obtenerRangoHoyHonduras } from "../lib/fecha.js";
 
 import { crearOActualizarCliente } from "../clientes/service.js";
 
@@ -659,10 +660,7 @@ export async function listarHabitacionesDisponiblesWalkIn({ fechaEntrada, fechaS
 }
 
 export async function listarReservasParaCheckIn() {
-  const inicio = new Date();
-  inicio.setHours(0, 0, 0, 0);
-  const fin = new Date(inicio);
-  fin.setDate(fin.getDate() + 1);
+  const { inicio, fin } = obtenerRangoHoyHonduras();
 
   const reservas = await prisma.reserva.findMany({
     where: {
@@ -750,10 +748,7 @@ export async function cancelarReservaPorId(reservaId) {
 // reservada, muestra qué otras habitaciones de la misma capacidad están
 // libres AHORA, por si se quiere reasignar al momento de la entrada.
 export async function listarAlternativasParaCheckIn(habitacionId) {
-  const inicio = new Date();
-  inicio.setHours(0, 0, 0, 0);
-  const fin = new Date(inicio);
-  fin.setDate(fin.getDate() + 1);
+  const { inicio, fin } = obtenerRangoHoyHonduras();
 
   const reserva = await prisma.reserva.findFirst({
     where: {
@@ -803,10 +798,7 @@ export async function registrarCheckInPorHabitacion(
   metodoPago,
   nuevaHabitacionId
 ) {
-  const inicio = new Date();
-  inicio.setHours(0, 0, 0, 0);
-  const fin = new Date(inicio);
-  fin.setDate(fin.getDate() + 1);
+  const { inicio, fin } = obtenerRangoHoyHonduras();
 
   const reserva = await prisma.reserva.findFirst({
     where: {

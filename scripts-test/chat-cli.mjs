@@ -1,4 +1,4 @@
-// Chat de prueba por terminal — usa la MISMA lógica que WhatsApp
+  // Chat de prueba por terminal — usa la MISMA lógica que WhatsApp
 // (mismo Gemini, mismo prompt, misma base de datos), solo que en vez de
 // mandar y recibir por WhatsApp, escribes y lees directo en la consola.
 // Así puedes probar conversaciones completas en segundos, no minutos.
