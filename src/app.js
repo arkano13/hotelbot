@@ -52,10 +52,11 @@ app.get("/qr", async (req, res) => {
   if (!qr) {
     return res.send(`
       <html>
+        <head><meta http-equiv="refresh" content="5"></head>
         <body style="font-family: sans-serif; text-align: center; padding: 40px;">
           <h2>No hay ningún código QR pendiente ahora mismo</h2>
           <p>Esto pasa si WhatsApp ya está conectado, o si el servidor apenas está arrancando.
-          Recarga esta página en unos segundos si acabas de reiniciar el servicio.</p>
+          Esta página se recarga sola cada 5 segundos.</p>
         </body>
       </html>
     `);
@@ -66,11 +67,12 @@ app.get("/qr", async (req, res) => {
 
     res.send(`
       <html>
+        <head><meta http-equiv="refresh" content="15"></head>
         <body style="font-family: sans-serif; text-align: center; padding: 40px;">
           <h2>Escanea este código con WhatsApp</h2>
           <p>Configuración → Dispositivos vinculados → Vincular un dispositivo</p>
           <img src="${imagenDataUrl}" width="320" height="320" />
-          <p style="color: #888; font-size: 13px;">Esta página se actualiza sola si recargas — el código cambia cada cierto tiempo si no lo escaneas a tiempo.</p>
+          <p style="color: #888; font-size: 13px;">El código vence cada 20-30 segundos — esta página se refresca sola cada 15 segundos para que siempre veas uno vigente. Escanéalo apenas la veas, no la dejes abierta esperando.</p>
         </body>
       </html>
     `);
