@@ -1,5 +1,6 @@
 import { hotelInfo } from "../config/hotelInfo.js";
 import { enviarNotificacionATodos } from "../notificaciones/service.js";
+import { crearFechaHonduras } from "../lib/fecha.js";
 
 import { obtenerTarifaPorPersonas } from "../tarifas/service.js";
 import {
@@ -13,6 +14,8 @@ import {
   obtenerReservaPorCodigo,
 } from "../reservas/service.js";
 
+import { obtenerPagoPorCodigo } from "../pagos/service.js";
+
 
 import {
   actualizarEstadoConversacion,
@@ -25,8 +28,8 @@ function formatearFecha(fecha) {
 }
 
 function calcularNoches(fechaEntrada, fechaSalida) {
-  const entrada = new Date(`${fechaEntrada}T00:00:00`);
-  const salida = new Date(`${fechaSalida}T00:00:00`);
+  const entrada = crearFechaHonduras(fechaEntrada);
+  const salida = crearFechaHonduras(fechaSalida);
 
   return Math.round(
     (salida.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24),
@@ -72,8 +75,8 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
 
       if (conversationId) {
         await actualizarEstadoConversacion(conversationId, {
-          fechaEntrada: new Date(`${fechaEntrada}T00:00:00`),
-          fechaSalida: new Date(`${fechaSalida}T00:00:00`),
+          fechaEntrada: crearFechaHonduras(fechaEntrada),
+          fechaSalida: crearFechaHonduras(fechaSalida),
           cantidadPersonas: personas,
           ultimaDisponibilidadAt: new Date(),
           nombreCliente: null,
@@ -269,9 +272,28 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
 
       const codigoReserva = String(argumentos?.codigo ?? "").trim();
 
-      const reserva = codigoReserva
-        ? await obtenerReservaPorCodigo(codigoReserva)
-        : await obtenerReservaMasRecientePorTelefono(telefono);
+      let reserva = null;
+
+      if (codigoReserva) {
+        try {
+          reserva = await obtenerReservaPorCodigo(codigoReserva);
+        } catch {
+          // Puede que el cliente haya dado el "código de revisión" del pago
+          // (el que se le da al subir el comprobante, ej. P1234) en vez del
+          // código de reserva — se intenta también por ese lado antes de
+          // rendirse.
+          try {
+            const pago = await obtenerPagoPorCodigo(codigoReserva);
+            reserva = pago?.reserva
+              ? await obtenerReservaPorCodigo(pago.reserva.codigo)
+              : null;
+          } catch {
+            reserva = null;
+          }
+        }
+      } else {
+        reserva = await obtenerReservaMasRecientePorTelefono(telefono);
+      }
 
       // No revelar reservas de otras personas: si el código pertenece a un
       // cliente distinto al que está preguntando, se responde igual que si
@@ -347,8 +369,8 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
 
       if (conversationId) {
         await actualizarEstadoConversacion(conversationId, {
-          fechaEntrada: new Date(`${fechaEntrada}T00:00:00`),
-          fechaSalida: new Date(`${fechaSalida}T00:00:00`),
+          fechaEntrada: crearFechaHonduras(fechaEntrada),
+          fechaSalida: crearFechaHonduras(fechaSalida),
           cantidadPersonas: personas,
           ultimaDisponibilidadAt: new Date(),
           nombreCliente: null,

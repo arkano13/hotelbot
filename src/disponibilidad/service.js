@@ -1,12 +1,13 @@
 import { prisma } from "../lib/prisma.js";
+import { crearFechaHonduras } from "../lib/fecha.js";
 
 export async function consultarDisponibilidad({
   fechaEntrada,
   fechaSalida,
   personas,
 }) {
-  const entrada = new Date(`${fechaEntrada}T00:00:00`);
-  const salida = new Date(`${fechaSalida}T00:00:00`);
+  const entrada = crearFechaHonduras(fechaEntrada);
+  const salida = crearFechaHonduras(fechaSalida);
 
   const cantidad = Number(personas);
 
@@ -81,8 +82,8 @@ export async function consultarDisponibilidadMultiple({
   fechaSalida,
   personas,
 }) {
-  const entrada = new Date(`${fechaEntrada}T00:00:00`);
-  const salida = new Date(`${fechaSalida}T00:00:00`);
+  const entrada = crearFechaHonduras(fechaEntrada);
+  const salida = crearFechaHonduras(fechaSalida);
   const cantidadPersonas = Number(personas);
 
   if (

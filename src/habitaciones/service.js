@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { obtenerRangoHoyHonduras } from "../lib/fecha.js";
+import { obtenerRangoHoyHonduras, crearFechaHonduras } from "../lib/fecha.js";
 
 export async function listarHabitacionesConEstado() {
   const { inicio, fin } = obtenerRangoHoyHonduras();
@@ -86,8 +86,8 @@ export async function listarHabitacionesPorCapacidadConEstado({
   fechaSalida,
   personas,
 }) {
-  const entrada = new Date(`${fechaEntrada}T00:00:00`);
-  const salida = new Date(`${fechaSalida}T00:00:00`);
+  const entrada = crearFechaHonduras(fechaEntrada);
+  const salida = crearFechaHonduras(fechaSalida);
   const cantidadPersonas = Number(personas);
 
   if (Number.isNaN(entrada.getTime()) || Number.isNaN(salida.getTime())) {

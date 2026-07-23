@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../auditoria/service.js";
-import { obtenerRangoHoyHonduras } from "../lib/fecha.js";
+import { obtenerRangoHoyHonduras, crearFechaHonduras } from "../lib/fecha.js";
 
 import { crearOActualizarCliente } from "../clientes/service.js";
 
@@ -36,7 +36,7 @@ async function ejecutarTransaccionSerializable(operacion, intentosMaximos = 3) {
 }
 
 function crearFecha(fecha) {
-  return new Date(`${fecha}T00:00:00`);
+  return crearFechaHonduras(fecha);
 }
 
 function calcularNoches(fechaEntrada, fechaSalida) {
