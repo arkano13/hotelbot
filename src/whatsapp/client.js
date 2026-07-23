@@ -1,6 +1,7 @@
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
+  fetchLatestWaWebVersion,
 } from "@whiskeysockets/baileys";
 
 import qrcode from "qrcode-terminal";
@@ -87,10 +88,29 @@ export async function iniciarWhatsApp() {
         AUTH_DIR
       );
 
+    // fetchLatestBaileysVersion() y la versión por defecto que trae Baileys
+    // tienen un bug conocido: devuelven una versión vieja de WhatsApp Web
+    // aunque digan que es la más reciente. Con esa versión vieja, el QR se
+    // genera bien pero WhatsApp rechaza el vínculo al final con "No se
+    // pudo vincular el dispositivo". fetchLatestWaWebVersion() sí trae la
+    // versión real y actualizada.
+    let version;
+    try {
+      const resultado = await fetchLatestWaWebVersion({});
+      version = resultado.version;
+      console.log(`📱 Usando WhatsApp Web versión ${version.join(".")}`);
+    } catch (error) {
+      console.error(
+        "⚠️ No se pudo obtener la versión más reciente de WhatsApp Web, usando la versión por defecto:",
+        error.message
+      );
+    }
+
     socket = makeWASocket({
       auth: state,
       logger,
       printQRInTerminal: false,
+      ...(version ? { version } : {}),
     });
 
     socket.ev.on("creds.update", saveCreds);
