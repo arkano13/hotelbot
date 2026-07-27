@@ -35,6 +35,11 @@ export const hotelTools = [
               type: "NUMBER",
               description: "Cantidad de personas: 1, 2, 3 o 4.",
             },
+            habitacion: {
+              type: "STRING",
+              description:
+                "Opcional. Solo se usa cuando en DATOS CONOCIDOS DEL CLIENTE hay una habitación preferida guardada para este cliente — en ese caso, pon aquí ese número automáticamente. Nunca lo llenes solo porque el cliente lo mencionó al pasar; este campo es exclusivamente para la preferencia guardada del sistema.",
+            },
           },
           required: ["fechaEntrada", "fechaSalida", "personas"],
         },
@@ -61,6 +66,11 @@ export const hotelTools = [
               enum: ["efectivo", "transferencia"],
               description:
                 "Método de pago elegido por el cliente: 'efectivo' (paga al llegar, tiene 24 horas) o 'transferencia' (debe enviar comprobante).",
+            },
+            habitacion: {
+              type: "STRING",
+              description:
+                "Opcional. Solo se usa cuando en DATOS CONOCIDOS DEL CLIENTE hay una habitación preferida guardada para este cliente. Debe ser el mismo valor que se usó en buscar_disponibilidad.",
             },
           },
           required: ["nombre", "documento", "metodo_pago"],

@@ -54,11 +54,13 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
       const fechaEntrada = argumentos.fechaEntrada;
       const fechaSalida = argumentos.fechaSalida;
       const personas = Number(argumentos.personas);
+      const habitacionPreferida = argumentos.habitacion;
 
       const resultado = await consultarDisponibilidad({
         fechaEntrada,
         fechaSalida,
         personas,
+        habitacionPreferida,
       });
 
       const cantidadNoches = calcularNoches(fechaEntrada, fechaSalida);
@@ -169,6 +171,7 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         personas: conversacion.cantidadPersonas,
         documento,
         metodoPago,
+        habitacionPreferida: argumentos.habitacion,
       });
 
       await actualizarEstadoConversacion(conversationId, {

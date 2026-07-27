@@ -72,6 +72,13 @@ model Cliente {
   telefono  String?  @unique
   correo    String?
   documento String?
+
+  // Número de habitación que este cliente prefiere siempre (ej. "5").
+  // Si está lleno y disponible para la fecha, se le asigna automático
+  // sin que tenga que pedirla — si no está libre, se le busca otra
+  // normal.
+  habitacionPreferida String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -272,5 +279,20 @@ model DispositivoNotificacion {
   updatedAt DateTime @updatedAt
 
   @@map("dispositivos_notificacion")
+}
+
+// Avisos para la encargada de habitaciones (ej. "se ocupó la Hab. 3")
+// que llegaron fuera de su horario de trabajo — se guardan aquí y se
+// mandan solos apenas empieza su siguiente turno.
+model NotificacionEncargadaPendiente {
+  id        String    @id @default(uuid())
+  telefono  String
+  mensaje   String
+  enviada   Boolean   @default(false)
+  enviadaEn DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([enviada])
+  @@map("notificaciones_encargada_pendientes")
 }
 

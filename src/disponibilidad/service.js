@@ -5,6 +5,7 @@ export async function consultarDisponibilidad({
   fechaEntrada,
   fechaSalida,
   personas,
+  habitacionPreferida,
 }) {
   const entrada = crearFechaHonduras(fechaEntrada);
   const salida = crearFechaHonduras(fechaSalida);
@@ -41,6 +42,42 @@ export async function consultarDisponibilidad({
   // personas cuenta como si necesitara capacidad 3, no una habitación
   // "más grande" de verdad.
   const capacidadNecesaria = cantidad === 4 ? 3 : cantidad;
+
+  // Si el cliente pidió una habitación específica por número, se revisa
+  // primero esa sola. Si está libre, se le da directo — al ser una
+  // elección explícita del cliente (no una sustitución automática del
+  // sistema), nunca requiere aprobación del dueño, sin importar si es
+  // más grande de lo que necesitaba.
+  const numeroPreferido = String(habitacionPreferida ?? "").trim();
+
+  if (numeroPreferido) {
+    const habitacionElegida = await prisma.habitacion.findFirst({
+      where: {
+        numero: numeroPreferido,
+        activa: true,
+        estado: "DISPONIBLE",
+        capacidad: { gte: capacidadNecesaria },
+        reservas: {
+          none: {
+            estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+            fechaEntrada: { lt: salida },
+            fechaSalida: { gt: entrada },
+          },
+        },
+      },
+    });
+
+    if (habitacionElegida) {
+      return {
+        disponible: true,
+        totalDisponibles: 1,
+        habitacion: habitacionElegida,
+        esHabitacionMasGrande: false,
+      };
+    }
+    // Si la pedida no está libre (o no alcanza), sigue con la búsqueda
+    // normal más abajo, para ofrecer una alternativa.
+  }
 
   const habitaciones = await prisma.habitacion.findMany({
     where: {
@@ -80,6 +117,7 @@ export async function consultarDisponibilidad({
     totalDisponibles: habitaciones.length,
     habitacion,
     esHabitacionMasGrande: habitacion ? habitacion.capacidad > capacidadNecesaria : false,
+    habitacionPreferidaNoDisponible: Boolean(numeroPreferido),
   };
 }
 

@@ -168,6 +168,7 @@ export async function generarRespuestaGemini({
 DATOS CONOCIDOS DEL CLIENTE (de una reserva anterior con este mismo número):
 - Nombre: ${clienteConocido.nombre ?? "no registrado"}
 - Número de identidad: ${clienteConocido.documento ?? "no registrado"}
+${clienteConocido.habitacionPreferida ? `- Habitación preferida: ${clienteConocido.habitacionPreferida} (SIEMPRE pídesela automáticamente al buscar disponibilidad y al crear la reserva — usa el parámetro "habitacion" con este número, sin preguntarle nada, a menos que él pida otra habitación distinta o diga que esta vez quiere algo diferente. Si no está disponible para esas fechas, ofrécele la mejor alternativa igual que harías con cualquier cliente.)` : ""}
 
 Si ambos datos están registrados, NO se los vuelvas a pedir — úsalos directamente para completar la reserva, salvo que el cliente te diga explícitamente que quiere corregir alguno. Si falta alguno de los dos, pide solo el que falta.
 

@@ -173,6 +173,7 @@ export async function crearReservaTemporal({
   documento,
   metodoPago,
   observaciones,
+  habitacionPreferida,
 }) {
   const {
     nombreLimpio,
@@ -203,6 +204,7 @@ export async function crearReservaTemporal({
       fechaEntrada,
       fechaSalida,
       personas: cantidadPersonas,
+      habitacionPreferida,
     });
 
   if (

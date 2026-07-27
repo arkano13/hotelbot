@@ -41,6 +41,7 @@ import {
 } from "../conversations/service.js";
 
 import { registrarDispositivo } from "../notificaciones/service.js";
+import { notificarEncargadaHabitacionOcupada } from "../notificaciones/encargadaService.js";
 import { enviarReporteDiario, enviarReporteMensual } from "../reportes/Scheduler.js";
 
 function manejarError(res, error) {
@@ -93,6 +94,16 @@ export async function hacerCheckIn(req, res) {
       req.body?.metodoPago,
       req.body?.nuevaHabitacionId
     );
+
+    await notificarEncargadaHabitacionOcupada({
+      numero: datos.habitacion.numero,
+      cliente: datos.cliente.nombre,
+      personas: datos.cantidadPersonas,
+      fechaSalida: datos.fechaSalida,
+    }).catch((error) =>
+      console.error("❌ Error notificando a la encargada:", error)
+    );
+
     return res.json({ success: true, data: datos });
   } catch (error) {
     return manejarError(res, error);
@@ -203,6 +214,16 @@ export async function habitacionesPorCapacidadConEstado(req, res) {
 export async function crearWalkIn(req, res) {
   try {
     const datos = await crearReservaWalkIn(req.body);
+
+    await notificarEncargadaHabitacionOcupada({
+      numero: datos.habitacion.numero,
+      cliente: datos.cliente.nombre,
+      personas: datos.cantidadPersonas,
+      fechaSalida: datos.fechaSalida,
+    }).catch((error) =>
+      console.error("❌ Error notificando a la encargada:", error)
+    );
+
     return res.json({ success: true, data: datos });
   } catch (error) {
     return manejarError(res, error);
@@ -304,6 +325,10 @@ function notificarClientePorWhatsApp(telefono, texto) {
   }
 }
 
+// Avisa a la encargada de habitaciones (número configurado en
+// ENCARGADA_PHONE) cada vez que una habitación queda ocupada de verdad
+// — ya sea por walk-in o porque alguien con reserva de WhatsApp llegó
+// (Entrada). Si no hay número configurado, simplemente no manda nada.
 export async function reservasQueRequierenAprobacion(req, res) {
   try {
     const datos = await listarReservasQueRequierenAprobacion();
