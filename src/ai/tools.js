@@ -4,13 +4,13 @@ export const hotelTools = [
       {
         name: "consultar_tarifas",
         description:
-          "Consulta el precio real por noche para 1, 2 o 3 personas.",
+          "Consulta el precio real por noche para 1, 2, 3 o 4 personas (4 cobra igual que 3).",
         parameters: {
           type: "OBJECT",
           properties: {
             personas: {
               type: "NUMBER",
-              description: "Cantidad de personas: 1, 2 o 3.",
+              description: "Cantidad de personas: 1, 2, 3 o 4.",
             },
           },
           required: ["personas"],
@@ -33,7 +33,7 @@ export const hotelTools = [
             },
             personas: {
               type: "NUMBER",
-              description: "Cantidad de personas: 1, 2 o 3.",
+              description: "Cantidad de personas: 1, 2, 3 o 4.",
             },
           },
           required: ["fechaEntrada", "fechaSalida", "personas"],
@@ -78,7 +78,7 @@ export const hotelTools = [
       {
         name: "buscar_disponibilidad_multiple",
         description:
-          "Busca varias habitaciones para un grupo, repartiendo personas entre ellas. Úsala para grupos de 4 o más personas, o como respaldo cuando 2 o 3 personas no caben en una sola habitación (buscar_disponibilidad no encontró nada) y el cliente acepta repartirse en varias habitaciones.",
+          "Busca varias habitaciones para un grupo, repartiendo personas entre ellas. Úsala para grupos de 5 o más personas, o como respaldo cuando 1 a 4 personas no caben en una sola habitación (buscar_disponibilidad no encontró nada) y el cliente acepta repartirse en varias habitaciones.",
         parameters: {
           type: "OBJECT",
           properties: {

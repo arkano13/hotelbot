@@ -196,7 +196,7 @@ describe("crearReservaTemporal — validaciones", () => {
     ).rejects.toThrow("El número de identidad es obligatorio");
   });
 
-  it("rechaza más de 3 personas (debe usar reserva múltiple)", async () => {
+  it("rechaza más de 4 personas (debe usar reserva múltiple)", async () => {
     await expect(
       crearReservaTemporal({
         nombre: "Juan Pérez",
@@ -205,9 +205,9 @@ describe("crearReservaTemporal — validaciones", () => {
         metodoPago: "transferencia",
         fechaEntrada: MAÑANA,
         fechaSalida: MAÑANA_MAS_2,
-        personas: 4,
+        personas: 5,
       })
-    ).rejects.toThrow("Para más de 3 personas se deben crear varias habitaciones");
+    ).rejects.toThrow("Para más de 4 personas se deben crear varias habitaciones");
   });
 
   it("permite espacios en blanco alrededor del nombre y los recorta", async () => {

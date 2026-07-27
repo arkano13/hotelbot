@@ -32,16 +32,22 @@ export async function consultarDisponibilidad({
     throw new Error("La fecha de salida debe ser posterior a la entrada");
   }
 
-  if (![1, 2, 3].includes(cantidad)) {
-    throw new Error("La cantidad de personas debe ser 1, 2 o 3");
+  if (![1, 2, 3, 4].includes(cantidad)) {
+    throw new Error("La cantidad de personas debe ser 1, 2, 3 o 4");
   }
+
+  // Las habitaciones de capacidad 3 tienen 3 camas (2 sencillas + 1
+  // doble) y caben hasta 4 personas sin problema — para la búsqueda, 4
+  // personas cuenta como si necesitara capacidad 3, no una habitación
+  // "más grande" de verdad.
+  const capacidadNecesaria = cantidad === 4 ? 3 : cantidad;
 
   const habitaciones = await prisma.habitacion.findMany({
     where: {
       activa: true,
       estado: "DISPONIBLE",
       capacidad: {
-        gte: cantidad,
+        gte: capacidadNecesaria,
       },
       reservas: {
         none: {
@@ -73,7 +79,7 @@ export async function consultarDisponibilidad({
     disponible: habitaciones.length > 0,
     totalDisponibles: habitaciones.length,
     habitacion,
-    esHabitacionMasGrande: habitacion ? habitacion.capacidad > cantidad : false,
+    esHabitacionMasGrande: habitacion ? habitacion.capacidad > capacidadNecesaria : false,
   };
 }
 
@@ -131,28 +137,34 @@ export async function consultarDisponibilidadMultiple({
       },
     });
 
-  // Calcula los "bloques" ideales en los que se va a repartir al grupo,
-  // evitando dejar un sobrante de 1 sola persona (eso desperdiciaría una
-  // habitación de 3 en alguien que cabría perfecto en una de 1 o 2).
-  // Ejemplo: 4 personas -> [2, 2] en vez de [3, 1].
-  //          7 personas -> [3, 2, 2] en vez de [3, 3, 1].
+  // Calcula los "bloques" ideales en los que se va a repartir al grupo.
+  // Las habitaciones de capacidad 3 en realidad tienen 3 camas (2
+  // sencillas + 1 doble) y caben hasta 4 personas sin costo extra — por
+  // eso el bloque más grande que se intenta es 4, no 3. Esto reduce
+  // cuántas habitaciones hacen falta para grupos grandes.
+  // Ejemplo: 4 personas -> [4] (una sola habitación, no dos de 2).
+  //          7 personas -> [4, 3] (dos habitaciones, no tres).
   function calcularBloquesIdeales(total) {
     const bloques = [];
     let restante = total;
 
-    while (restante > 3) {
-      bloques.push(3);
-      restante -= 3;
+    while (restante > 4) {
+      bloques.push(4);
+      restante -= 4;
     }
 
-    if (restante === 1 && bloques.length > 0) {
-      bloques.pop();
-      bloques.push(2, 2);
-    } else if (restante > 0) {
+    if (restante > 0) {
       bloques.push(restante);
     }
 
     return bloques;
+  }
+
+  // Una habitación de capacidad 3 sirve tanto para un bloque de 3 como
+  // para uno de 4 (por las 3 camas). Para cualquier otro tamaño de
+  // bloque, la capacidad exacta de la habitación debe coincidir tal cual.
+  function capacidadDeHabitacionParaBloque(capacidadBloque) {
+    return capacidadBloque === 4 ? 3 : capacidadBloque;
   }
 
   const disponiblesOrdenadas = [...habitacionesDisponibles].sort(
@@ -170,14 +182,17 @@ export async function consultarDisponibilidadMultiple({
     const seleccionadas = [];
 
     for (const capacidadNecesaria of bloques) {
+      const capacidadHabitacionBuscada =
+        capacidadDeHabitacionParaBloque(capacidadNecesaria);
+
       // Primero busca una habitación de capacidad EXACTA; si no hay, la más
       // pequeña que alcance (nunca al revés, para no desperdiciar).
       const habitacion =
         disponiblesOrdenadas.find(
-          (h) => !usadasIds.has(h.id) && h.capacidad === capacidadNecesaria
+          (h) => !usadasIds.has(h.id) && h.capacidad === capacidadHabitacionBuscada
         ) ??
         disponiblesOrdenadas.find(
-          (h) => !usadasIds.has(h.id) && h.capacidad > capacidadNecesaria
+          (h) => !usadasIds.has(h.id) && h.capacidad > capacidadHabitacionBuscada
         );
 
       if (!habitacion) return null;
@@ -196,12 +211,11 @@ export async function consultarDisponibilidadMultiple({
   }
 
   // Plan B: para grupos grandes que agotan el inventario de habitaciones
-  // grandes (ej. piden 9 personas pero solo hay 2 de capacidad 3), el
-  // reparto "ideal" de arriba puede no encontrar suficientes habitaciones
-  // exactas. En ese caso, se cae a un empaquetado más flexible que sí
-  // siempre encuentra una combinación válida si la capacidad total alcanza
-  // — aunque no reparta tan parejo, es mejor que decir "no hay
-  // disponibilidad" cuando en realidad sí caben.
+  // grandes, el reparto "ideal" de arriba puede no encontrar suficientes
+  // habitaciones exactas. En ese caso, se cae a un empaquetado más
+  // flexible que sí siempre encuentra una combinación válida si la
+  // capacidad total alcanza — aunque no reparta tan parejo, es mejor que
+  // decir "no hay disponibilidad" cuando en realidad sí caben.
   function intentarConEmpaquetadoFlexible() {
     const ordenadasPorCapacidadDesc = [...habitacionesDisponibles].sort(
       (a, b) => b.capacidad - a.capacidad
@@ -213,7 +227,10 @@ export async function consultarDisponibilidadMultiple({
     for (const habitacion of ordenadasPorCapacidadDesc) {
       if (restantes <= 0) break;
 
-      const capacidadAsignada = Math.min(habitacion.capacidad, restantes, 3);
+      // Una habitación de capacidad 3 aguanta hasta 4 (3 camas: 2
+      // sencillas + 1 doble); las demás, su capacidad tal cual.
+      const limiteHabitacion = habitacion.capacidad === 3 ? 4 : habitacion.capacidad;
+      const capacidadAsignada = Math.min(limiteHabitacion, restantes);
 
       if (capacidadAsignada < 1) continue;
 

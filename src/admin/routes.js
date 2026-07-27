@@ -27,6 +27,9 @@ import {
   aprobarHabitacion,
   rechazarHabitacion,
   reiniciarWhatsApp,
+  reporteDiario,
+  reporteMensual,
+  fechaActualHonduras,
   registrarDispositivoPush,
 } from "./controller.js";
 
@@ -78,6 +81,14 @@ router.post("/reservas-requieren-aprobacion/:reservaId/rechazar", rechazarHabita
 
 // Reiniciar sesión de WhatsApp (borra auth_info_baileys y genera QR nuevo)
 router.post("/whatsapp/reiniciar", reiniciarWhatsApp);
+
+// Reportes bajo demanda (además del envío automático diario/mensual)
+router.get("/reportes/diario", reporteDiario);
+router.get("/reportes/mensual", reporteMensual);
+
+// Fecha real de Honduras, para que la app nunca dependa del reloj del
+// dispositivo (tablets a veces tienen mal la zona horaria).
+router.get("/fecha-actual", fechaActualHonduras);
 
 // Notificaciones push
 router.post("/dispositivos", registrarDispositivoPush);

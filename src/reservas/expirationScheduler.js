@@ -1,6 +1,7 @@
 import {
   expirarReservasPendientes,
   procesarCheckoutsAutomaticos,
+  procesarCheckoutsPorHoras,
 } from "./expirationService.js";
 import { obtenerHoraCheckOutTexto } from "../config/hotelInfo.js";
 
@@ -19,6 +20,7 @@ async function revisarReservas() {
   try {
     await expirarReservasPendientes();
     await procesarCheckoutsAutomaticos();
+    await procesarCheckoutsPorHoras();
   } catch (error) {
     console.error("❌ Error ejecutando scheduler de reservas:", error);
   } finally {

@@ -1,4 +1,3 @@
-// test/tarifas.service.test.js
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const prismaMock = {
@@ -23,31 +22,46 @@ describe("obtenerTarifaPorPersonas", () => {
 
   it("rechaza 0 personas", async () => {
     await expect(obtenerTarifaPorPersonas(0)).rejects.toThrow(
-      "La cantidad de personas debe ser 1, 2 o 3"
+      "La cantidad de personas debe ser 1, 2, 3 o 4"
     );
   });
 
-  it("rechaza 4 personas (fuera de rango de tarifa individual)", async () => {
-    await expect(obtenerTarifaPorPersonas(4)).rejects.toThrow(
-      "La cantidad de personas debe ser 1, 2 o 3"
+  it("acepta 4 personas y cobra la misma tarifa que 3 (mismas camas, sin costo extra)", async () => {
+    prismaMock.tarifa.findUnique.mockResolvedValue({
+      personas: 3,
+      precio: 800,
+      activa: true,
+    });
+
+    const tarifa = await obtenerTarifaPorPersonas(4);
+
+    expect(tarifa.precio).toBe(800);
+    expect(prismaMock.tarifa.findUnique).toHaveBeenCalledWith({
+      where: { personas: 3 },
+    });
+  });
+
+  it("rechaza 5 personas (ya no cabe en una sola habitación)", async () => {
+    await expect(obtenerTarifaPorPersonas(5)).rejects.toThrow(
+      "La cantidad de personas debe ser 1, 2, 3 o 4"
     );
   });
 
   it("rechaza números no enteros", async () => {
     await expect(obtenerTarifaPorPersonas(1.5)).rejects.toThrow(
-      "La cantidad de personas debe ser 1, 2 o 3"
+      "La cantidad de personas debe ser 1, 2, 3 o 4"
     );
   });
 
   it("rechaza negativos", async () => {
     await expect(obtenerTarifaPorPersonas(-1)).rejects.toThrow(
-      "La cantidad de personas debe ser 1, 2 o 3"
+      "La cantidad de personas debe ser 1, 2, 3 o 4"
     );
   });
 
   it("rechaza valores no numéricos", async () => {
     await expect(obtenerTarifaPorPersonas("abc")).rejects.toThrow(
-      "La cantidad de personas debe ser 1, 2 o 3"
+      "La cantidad de personas debe ser 1, 2, 3 o 4"
     );
   });
 

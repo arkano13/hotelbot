@@ -1,4 +1,3 @@
-// test/disponibilidad.service.test.js
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const prismaMock = {
@@ -68,17 +67,35 @@ describe("consultarDisponibilidad (individual)", () => {
         fechaSalida: MAÑANA_MAS_2,
         personas: 0,
       })
-    ).rejects.toThrow("La cantidad de personas debe ser 1, 2 o 3");
+    ).rejects.toThrow("La cantidad de personas debe ser 1, 2, 3 o 4");
   });
 
-  it("rechaza 4 personas (no existe tarifa individual para 4)", async () => {
+  it("acepta 4 personas y busca habitaciones de capacidad 3 (3 camas: 2 sencillas + 1 doble)", async () => {
+    prismaMock.habitacion.findMany.mockResolvedValue([
+      { id: "c", numero: "3", capacidad: 3 },
+    ]);
+
+    const resultado = await consultarDisponibilidad({
+      fechaEntrada: MAÑANA,
+      fechaSalida: MAÑANA_MAS_2,
+      personas: 4,
+    });
+
+    expect(resultado.disponible).toBe(true);
+    expect(resultado.habitacion.capacidad).toBe(3);
+    // No debe marcarse como "habitación más grande" — 4 en capacidad 3 es
+    // el caso normal, no requiere aprobación del dueño.
+    expect(resultado.esHabitacionMasGrande).toBe(false);
+  });
+
+  it("rechaza 5 personas (ya no cabe en una sola habitación)", async () => {
     await expect(
       consultarDisponibilidad({
         fechaEntrada: MAÑANA,
         fechaSalida: MAÑANA_MAS_2,
-        personas: 4,
+        personas: 5,
       })
-    ).rejects.toThrow("La cantidad de personas debe ser 1, 2 o 3");
+    ).rejects.toThrow("La cantidad de personas debe ser 1, 2, 3 o 4");
   });
 
   it("retorna disponible:false si no hay habitaciones", async () => {
@@ -115,16 +132,16 @@ describe("consultarDisponibilidad (individual)", () => {
 describe("consultarDisponibilidadMultiple (grupos 4+)", () => {
   beforeEach(() => vi.resetAllMocks());
 
-  it("rechaza grupos menores a 4 personas", async () => {
+  it("rechaza grupos menores a 2 personas", async () => {
     prismaMock.habitacion.findMany.mockResolvedValue([]);
 
     await expect(
       consultarDisponibilidadMultiple({
         fechaEntrada: MAÑANA,
         fechaSalida: MAÑANA_MAS_2,
-        personas: 3,
+        personas: 1,
       })
-    ).rejects.toThrow("Esta consulta es para grupos de 4 personas o más");
+    ).rejects.toThrow("Esta consulta es para grupos de 2 personas o más");
   });
 
   it("distribuye 4 personas en habitaciones (suma debe dar 4)", async () => {
@@ -149,7 +166,7 @@ describe("consultarDisponibilidadMultiple (grupos 4+)", () => {
     expect(new Set(idsUsados).size).toBe(idsUsados.length);
   });
 
-  it("distribuye 8 personas correctamente (3+3+2)", async () => {
+  it("distribuye 8 personas correctamente (4+4, aprovechando que capacidad 3 = hasta 4 personas)", async () => {
     prismaMock.habitacion.findMany.mockResolvedValue([
       { id: "r4", numero: "4", capacidad: 2 },
       { id: "r7", numero: "7", capacidad: 3 },
@@ -165,10 +182,11 @@ describe("consultarDisponibilidadMultiple (grupos 4+)", () => {
     expect(resultado.disponible).toBe(true);
     const suma = resultado.distribucion.reduce((a, b) => a + b, 0);
     expect(suma).toBe(8);
-    expect(resultado.habitaciones).toHaveLength(3);
+    expect(resultado.habitaciones).toHaveLength(2);
   });
 
   it("retorna disponible:false si no alcanzan las habitaciones libres", async () => {
+    // Solo 1 habitación libre para un grupo de 6 (necesita 2 habitaciones: 3+3)
     prismaMock.habitacion.findMany.mockResolvedValue([
       { id: "r7", numero: "7", capacidad: 3 },
     ]);
@@ -183,7 +201,7 @@ describe("consultarDisponibilidadMultiple (grupos 4+)", () => {
     expect(resultado.habitaciones).toEqual([]);
   });
 
-  it("no asigna dos veces la misma habitación aunque sobre capacidad", async () => {
+  it("4 personas caben en una sola habitación de capacidad 3 (3 camas: 2 sencillas + 1 doble)", async () => {
     prismaMock.habitacion.findMany.mockResolvedValue([
       { id: "r7", numero: "7", capacidad: 3 },
     ]);
@@ -192,6 +210,24 @@ describe("consultarDisponibilidadMultiple (grupos 4+)", () => {
       fechaEntrada: MAÑANA,
       fechaSalida: MAÑANA_MAS_2,
       personas: 4,
+    });
+
+    expect(resultado.disponible).toBe(true);
+    expect(resultado.habitaciones).toHaveLength(1);
+    expect(resultado.habitaciones[0].capacidadAsignada).toBe(4);
+  });
+
+  it("no asigna dos veces la misma habitación aunque sobre capacidad", async () => {
+    // 5 personas -> bloques [4, 1], necesita 2 habitaciones distintas,
+    // pero solo hay 1 disponible.
+    prismaMock.habitacion.findMany.mockResolvedValue([
+      { id: "r7", numero: "7", capacidad: 3 },
+    ]);
+
+    const resultado = await consultarDisponibilidadMultiple({
+      fechaEntrada: MAÑANA,
+      fechaSalida: MAÑANA_MAS_2,
+      personas: 5,
     });
 
     expect(resultado.disponible).toBe(false);

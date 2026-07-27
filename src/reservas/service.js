@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../auditoria/service.js";
-import { obtenerRangoHoyHonduras, crearFechaHonduras } from "../lib/fecha.js";
+import { obtenerRangoHoyHonduras, crearFechaHonduras, ajustarEntradaWalkInMadrugada } from "../lib/fecha.js";
 
 import { crearOActualizarCliente } from "../clientes/service.js";
 
@@ -192,9 +192,9 @@ export async function crearReservaTemporal({
     metodoPago,
   });
 
-  if (cantidadPersonas > 3) {
+  if (cantidadPersonas > 4) {
     throw new Error(
-      "Para más de 3 personas se deben crear varias habitaciones"
+      "Para más de 4 personas se deben crear varias habitaciones"
     );
   }
 
@@ -349,6 +349,7 @@ export async function crearReservaWalkIn({
   habitacionId,
   documento,
   metodoPago,
+  tipoEstadia,
 }) {
   const metodo = String(metodoPago ?? "EFECTIVO").trim().toUpperCase();
 
@@ -356,21 +357,54 @@ export async function crearReservaWalkIn({
     throw new Error('El método de pago debe ser "efectivo", "transferencia" o "tarjeta"');
   }
 
-  const datos = validarDatosReserva({
-    nombre,
-    telefono,
-    fechaEntrada,
-    fechaSalida,
-    personas,
-    documento,
-    telefonoObligatorio: false,
-    documentoObligatorio: false,
-    metodoPagoObligatorio: false,
-  });
+  const esPorHoras = String(tipoEstadia ?? "NOCHE").toUpperCase() === "3_HORAS";
 
-  const { nombreLimpio, telefonoLimpio, documentoLimpio, cantidadPersonas, entrada, salida } = datos;
-  if (cantidadPersonas > 3) {
-    throw new Error("Para más de 3 personas se necesitan varias habitaciones.");
+  const PRECIO_3_HORAS = 350;
+  const DURACION_3_HORAS_MS = 3 * 60 * 60 * 1000;
+
+  let nombreLimpio, telefonoLimpio, documentoLimpio, cantidadPersonas, entrada, salida;
+
+  if (esPorHoras) {
+    // Estadía de 3 horas: entra AHORA mismo (no tiene sentido agendarla
+    // para otro día), sale exactamente 3 horas después. No usa noches ni
+    // la tarifa normal — es un precio fijo.
+    nombreLimpio = String(nombre ?? "").trim();
+    telefonoLimpio = String(telefono ?? "").trim();
+    documentoLimpio = String(documento ?? "").trim();
+    cantidadPersonas = Number(personas);
+
+    if (!nombreLimpio) throw new Error("El nombre y apellido son obligatorios");
+    if (!Number.isInteger(cantidadPersonas) || cantidadPersonas < 1) {
+      throw new Error("La cantidad de personas no es válida");
+    }
+
+    entrada = new Date();
+    salida = new Date(entrada.getTime() + DURACION_3_HORAS_MS);
+  } else {
+    // Si están registrando el walk-in de madrugada (antes de las 6 AM) para
+    // "hoy", esa noche en realidad ya pertenece a ayer — se recorre la
+    // fecha para que le toque salir hoy a la hora de checkout, no mañana.
+    const fechasAjustadas = ajustarEntradaWalkInMadrugada(fechaEntrada, fechaSalida);
+    fechaEntrada = fechasAjustadas.fechaEntrada;
+    fechaSalida = fechasAjustadas.fechaSalida;
+
+    const datos = validarDatosReserva({
+      nombre,
+      telefono,
+      fechaEntrada,
+      fechaSalida,
+      personas,
+      documento,
+      telefonoObligatorio: false,
+      documentoObligatorio: false,
+      metodoPagoObligatorio: false,
+    });
+
+    ({ nombreLimpio, telefonoLimpio, documentoLimpio, cantidadPersonas, entrada, salida } = datos);
+  }
+
+  if (cantidadPersonas > 4) {
+    throw new Error("Para más de 4 personas se necesitan varias habitaciones.");
   }
 
   let habitacion;
@@ -381,14 +415,15 @@ export async function crearReservaWalkIn({
     });
   } else {
     const disponibles = await listarHabitacionesDisponiblesWalkIn({
-      fechaEntrada,
-      fechaSalida,
+      fechaEntrada: entrada.toISOString().slice(0, 10),
+      fechaSalida: salida.toISOString().slice(0, 10),
       personas: cantidadPersonas,
     });
     habitacion = disponibles[0];
   }
 
-  if (!habitacion || habitacion.capacidad < cantidadPersonas) {
+  const capacidadMinimaNecesaria = cantidadPersonas === 4 ? 3 : cantidadPersonas;
+  if (!habitacion || habitacion.capacidad < capacidadMinimaNecesaria) {
     throw new Error("La habitación seleccionada no está disponible.");
   }
 
@@ -402,10 +437,18 @@ export async function crearReservaWalkIn({
   });
   if (conflicto) throw new Error("La habitación dejó de estar disponible.");
 
-  const tarifa = await obtenerTarifaPorPersonas(cantidadPersonas);
-  const cantidadNoches = calcularNoches(entrada, salida);
-  const precioPorNoche = Number(tarifa.precio);
-  const precioTotal = precioPorNoche * cantidadNoches;
+  let cantidadNoches, precioPorNoche, precioTotal;
+
+  if (esPorHoras) {
+    cantidadNoches = 0;
+    precioPorNoche = PRECIO_3_HORAS;
+    precioTotal = PRECIO_3_HORAS;
+  } else {
+    const tarifa = await obtenerTarifaPorPersonas(cantidadPersonas);
+    cantidadNoches = calcularNoches(entrada, salida);
+    precioPorNoche = Number(tarifa.precio);
+    precioTotal = precioPorNoche * cantidadNoches;
+  }
 
   const cliente = telefonoLimpio
     ? await crearOActualizarCliente({ nombre: nombreLimpio, telefono: telefonoLimpio, documento: documentoLimpio })
@@ -436,11 +479,14 @@ export async function crearReservaWalkIn({
         fechaSalida: salida,
         cantidadPersonas,
         cantidadNoches,
+        tipoEstadia: esPorHoras ? "3_HORAS" : "NOCHE",
         precioPorNoche,
         precioTotal,
         estado: "CHECK_IN",
         expiraEn: null,
-        observaciones: `Walk-in, pago en ${metodo.toLowerCase()}`,
+        observaciones: esPorHoras
+          ? `Walk-in 3 horas, pago en ${metodo.toLowerCase()}`
+          : `Walk-in, pago en ${metodo.toLowerCase()}`,
       },
     });
     const pago = await tx.pago.create({

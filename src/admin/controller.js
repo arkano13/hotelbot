@@ -41,6 +41,7 @@ import {
 } from "../conversations/service.js";
 
 import { registrarDispositivo } from "../notificaciones/service.js";
+import { enviarReporteDiario, enviarReporteMensual } from "../reportes/Scheduler.js";
 
 function manejarError(res, error) {
   return res.status(400).json({
@@ -349,6 +350,64 @@ export async function reiniciarWhatsApp(req, res) {
       success: true,
       message: "Sesión borrada, generando un código QR nuevo. Entra a /qr en unos segundos.",
     });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function reporteDiario(req, res) {
+  try {
+    const fechaISO =
+      req.query.fecha ||
+      new Intl.DateTimeFormat("en-CA", { timeZone: "America/Tegucigalpa" }).format(new Date());
+
+    const resumen = await enviarReporteDiario(fechaISO);
+    return res.json({ success: true, message: "Reporte enviado por WhatsApp al dueño.", data: resumen });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function reporteMensual(req, res) {
+  try {
+    const ahoraHonduras = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Tegucigalpa",
+      year: "numeric",
+      month: "2-digit",
+    }).formatToParts(new Date());
+
+    const anio = Number(req.query.anio) || Number(ahoraHonduras.find((p) => p.type === "year").value);
+    const mes = Number(req.query.mes) || Number(ahoraHonduras.find((p) => p.type === "month").value);
+
+    const resumen = await enviarReporteMensual(anio, mes);
+    return res.json({ success: true, message: "Reporte enviado por WhatsApp al dueño.", data: resumen });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function fechaActualHonduras(req, res) {
+  try {
+    const fecha = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Tegucigalpa",
+    }).format(new Date());
+
+    return res.json({ success: true, data: { fecha } });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function fechaActual(req, res) {
+  try {
+    // El reloj del celular/tablet no siempre está bien puesto (zona
+    // horaria equivocada, etc.) — la app usa esto para saber con certeza
+    // qué día es HOY en Honduras, sin depender del dispositivo.
+    const fecha = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Tegucigalpa",
+    }).format(new Date());
+
+    return res.json({ success: true, data: { fecha } });
   } catch (error) {
     return manejarError(res, error);
   }

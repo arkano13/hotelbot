@@ -103,6 +103,11 @@ model Reserva {
   cantidadPersonas Int
   cantidadNoches   Int
 
+  // "NOCHE" (lo normal) o "3_HORAS" (tarifa fija de 3 horas, para
+  // walk-in). Para "3_HORAS", fechaEntrada/fechaSalida son la hora
+  // exacta de entrada y de salida (3 horas después), no medianoche.
+  tipoEstadia String @default("NOCHE")
+
   precioPorNoche Decimal @db.Decimal(10, 2)
   precioTotal    Decimal @db.Decimal(10, 2)
 

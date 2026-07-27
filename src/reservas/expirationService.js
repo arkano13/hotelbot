@@ -95,6 +95,45 @@ export async function expirarReservasPendientes() {
   return cantidadExpirada;
 }
 
+export async function procesarCheckoutsPorHoras() {
+  const ahora = new Date();
+
+  const reservasParaCheckout = await prisma.reserva.findMany({
+    where: {
+      estado: "CHECK_IN",
+      tipoEstadia: "3_HORAS",
+      fechaSalida: {
+        lte: ahora,
+      },
+    },
+    select: {
+      id: true,
+      codigo: true,
+    },
+  });
+
+  let cantidadCheckout = 0;
+
+  for (const reserva of reservasParaCheckout) {
+    const resultado = await prisma.reserva.updateMany({
+      where: {
+        id: reserva.id,
+        estado: "CHECK_IN",
+      },
+      data: {
+        estado: "CHECK_OUT",
+      },
+    });
+
+    if (resultado.count > 0) {
+      cantidadCheckout++;
+      console.log(`🚪 Checkout automático (3 horas): ${reserva.codigo}`);
+    }
+  }
+
+  return cantidadCheckout;
+}
+
 export async function procesarCheckoutsAutomaticos() {
   const { fechaISO, hora } = obtenerFechaHoraHonduras();
 
