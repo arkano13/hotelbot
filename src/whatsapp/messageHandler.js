@@ -1,5 +1,4 @@
 import fs from "fs";
-import path from "path";
 import crypto from "crypto";
 import pino from "pino";
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
@@ -13,6 +12,7 @@ import {
 import { guardarMensaje } from "../messages/service.js";
 import { generarRespuestaGemini, transcribirAudio } from "../ai/gemini.js";
 import { obtenerConfiguracionBot } from "../configuracion/service.js";
+import { COMPROBANTES_DIR } from "../lib/paths.js";
 
 import { registrarComprobantes } from "../pagos/service.js";
 
@@ -132,7 +132,7 @@ async function procesarComprobante({ socket, jid, telefono, message }) {
 
   const extension = mimetype.includes("png") ? "png" : "jpg";
 
-  const carpeta = path.join(process.cwd(), "uploads", "comprobantes");
+  const carpeta = COMPROBANTES_DIR;
 
   await fs.promises.mkdir(carpeta, { recursive: true });
 
