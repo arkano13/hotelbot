@@ -17,7 +17,7 @@ import { apiLimiter } from "./lib/rateLimit.js";
 
 const app = express();
 
-app.set("trust proxy", 1);
+
 
 const ORIGENES_PERMITIDOS = (process.env.CORS_ORIGINS || "")
   .split(",")
