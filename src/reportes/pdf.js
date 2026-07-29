@@ -111,7 +111,8 @@ function dibujarPiesDePagina(doc) {
 }
 
 function dibujarSeccion(doc, texto) {
-  if (doc.y > doc.page.height - 130) {
+  // Evita dejar un título o un encabezado de tabla solo al final de la página.
+  if (doc.y > doc.page.height - 175) {
     doc.addPage();
     doc.y = MARGEN;
   }
@@ -208,7 +209,10 @@ function dibujarTabla(doc, columnas, filas, filaVacia) {
         .fontSize(8.5)
         .text(String(valor), x + 6, y + 7, {
           width: anchosColumnas[i] - 10,
+          height: alturaFila - 10,
           align: columnas[i].align || "left",
+          lineBreak: false,
+          ellipsis: true,
         });
 
       x += anchosColumnas[i];
@@ -306,13 +310,14 @@ function dibujarMetricas(doc, metricas, columnas = 3) {
 function columnasPagos(incluirFecha = false) {
   if (incluirFecha) {
     return [
-      { titulo: "Fecha", ancho: 0.13 },
-      { titulo: "Pago", ancho: 0.13 },
-      { titulo: "Reserva", ancho: 0.18 },
-      { titulo: "Cliente", ancho: 0.22 },
-      { titulo: "Hab.", ancho: 0.07, align: "center" },
-      { titulo: "Pers.", ancho: 0.07, align: "center" },
-      { titulo: "Monto", ancho: 0.2, align: "right" },
+      { titulo: "Fecha", ancho: 0.11 },
+      { titulo: "Método", ancho: 0.13 },
+      { titulo: "Pago", ancho: 0.12 },
+      { titulo: "Reserva", ancho: 0.16 },
+      { titulo: "Cliente", ancho: 0.19 },
+      { titulo: "Hab.", ancho: 0.06, align: "center" },
+      { titulo: "Pers.", ancho: 0.06, align: "center" },
+      { titulo: "Monto", ancho: 0.17, align: "right" },
     ];
   }
 
@@ -328,15 +333,28 @@ function columnasPagos(incluirFecha = false) {
 }
 
 function filasPagos(pagos, incluirFecha = false) {
-  return pagos.map((pago) => [
-    incluirFecha ? formatearFechaCorta(pago.fechaPago) : formatearHora(pago.fechaPago),
-    pago.codigoPago,
-    pago.codigoReserva,
-    recortar(pago.cliente, 24),
-    pago.habitacion,
-    pago.personas,
-    formatearMoneda(pago.monto),
-  ]);
+  return pagos.map((pago) => {
+    const fila = [
+      incluirFecha
+        ? formatearFechaCorta(pago.fechaPago)
+        : formatearHora(pago.fechaPago),
+    ];
+
+    if (incluirFecha) {
+      fila.push(pago.metodo === "TRANSFERENCIA" ? "TRANSF." : pago.metodo);
+    }
+
+    fila.push(
+      pago.codigoPago,
+      pago.codigoReserva,
+      recortar(pago.cliente, 24),
+      pago.habitacion,
+      pago.personas,
+      formatearMoneda(pago.monto),
+    );
+
+    return fila;
+  });
 }
 
 export async function generarPdfDiario(resumen) {
@@ -352,21 +370,35 @@ export async function generarPdfDiario(resumen) {
     dibujarMetricas(doc, [
       ["Ingresos recibidos", formatearMoneda(resumen.ingresosTotal)],
       ["Por transferencia", formatearMoneda(resumen.ingresosTransferencia)],
+      ["Por tarjeta", formatearMoneda(resumen.ingresosTarjeta)],
       ["En efectivo", formatearMoneda(resumen.ingresosEfectivo)],
       ["Pagos confirmados", String(resumen.cantidadPagos)],
       ["Huéspedes vendidos", String(resumen.huespedes)],
       ["Ticket promedio", formatearMoneda(resumen.ticketPromedio)],
+      ["Noches vendidas", String(resumen.nochesVendidas)],
+      ["Habitaciones vendidas", String(resumen.habitacionesVendidas)],
     ]);
 
     dibujarSeccion(
       doc,
-      `Comprobantes aprobados (${resumen.cantidadTransferencias})`,
+      `Transferencias aprobadas (${resumen.cantidadTransferencias})`,
     );
     dibujarTabla(
       doc,
       columnasPagos(),
       filasPagos(resumen.transferencias),
-      "No hubo comprobantes aprobados en este día.",
+      "No hubo transferencias aprobadas en este día.",
+    );
+
+    dibujarSeccion(
+      doc,
+      `Pagos con tarjeta aprobados (${resumen.cantidadTarjetas})`,
+    );
+    dibujarTabla(
+      doc,
+      columnasPagos(),
+      filasPagos(resumen.tarjetas),
+      "No hubo pagos con tarjeta aprobados en este día.",
     );
 
     dibujarSeccion(
@@ -409,7 +441,7 @@ export async function generarPdfDiario(resumen) {
       .fontSize(9)
       .fillColor(COLOR_TEXTO_SUAVE)
       .text(
-        "Solo se incluyen comprobantes aprobados y pagos en efectivo registrados al llegar. Se excluyen reservas sin pago, comprobantes pendientes, rechazados y vencidos.",
+        "Solo se incluyen pagos aprobados por transferencia, tarjeta o efectivo. Se excluyen reservas sin pago y pagos pendientes, rechazados, vencidos o no generados.",
         { width: anchoUtil(doc) },
       );
   });
@@ -428,6 +460,7 @@ export async function generarPdfMensual(resumen) {
     dibujarMetricas(doc, [
       ["Ingresos recibidos", formatearMoneda(resumen.ingresosTotal)],
       ["Por transferencia", formatearMoneda(resumen.ingresosTransferencia)],
+      ["Por tarjeta", formatearMoneda(resumen.ingresosTarjeta)],
       ["En efectivo", formatearMoneda(resumen.ingresosEfectivo)],
       ["Pagos confirmados", String(resumen.cantidadPagos)],
       ["Huéspedes vendidos", String(resumen.huespedes)],
@@ -454,6 +487,12 @@ export async function generarPdfMensual(resumen) {
           formatearMoneda(resumen.ingresosTransferencia),
         ],
         [
+          "TARJETA",
+          resumen.cantidadTarjetas,
+          resumen.tarjetas.reduce((total, pago) => total + pago.personas, 0),
+          formatearMoneda(resumen.ingresosTarjeta),
+        ],
+        [
           "EFECTIVO",
           resumen.cantidadEfectivos,
           resumen.efectivos.reduce((total, pago) => total + pago.personas, 0),
@@ -468,17 +507,19 @@ export async function generarPdfMensual(resumen) {
       doc,
       [
         { titulo: "Fecha", ancho: 0.18 },
-        { titulo: "Pagos", ancho: 0.12, align: "center" },
-        { titulo: "Huéspedes", ancho: 0.14, align: "center" },
-        { titulo: "Transfer.", ancho: 0.19, align: "right" },
-        { titulo: "Efectivo", ancho: 0.17, align: "right" },
-        { titulo: "Total", ancho: 0.2, align: "right" },
+        { titulo: "Pagos", ancho: 0.1, align: "center" },
+        { titulo: "Huésp.", ancho: 0.1, align: "center" },
+        { titulo: "Transfer.", ancho: 0.16, align: "right" },
+        { titulo: "Tarjeta", ancho: 0.15, align: "right" },
+        { titulo: "Efectivo", ancho: 0.15, align: "right" },
+        { titulo: "Total", ancho: 0.16, align: "right" },
       ],
       resumen.pagosPorDia.map((dia) => [
         dia.fecha,
         dia.cantidadPagos,
         dia.huespedes,
         formatearMoneda(dia.transferencias),
+        formatearMoneda(dia.tarjetas),
         formatearMoneda(dia.efectivos),
         formatearMoneda(dia.total),
       ]),
@@ -522,7 +563,7 @@ export async function generarPdfMensual(resumen) {
       .fontSize(9)
       .fillColor(COLOR_TEXTO_SUAVE)
       .text(
-        `${mejorDiaTexto}La ocupación se calcula con estadías pagadas y activas durante el mes. Los ingresos solo incluyen comprobantes aprobados y pagos en efectivo; se excluyen pagos pendientes, rechazados, vencidos y no generados.`,
+        `${mejorDiaTexto}La ocupación se calcula con estadías pagadas y activas durante el mes. Los ingresos solo incluyen pagos aprobados por transferencia, tarjeta o efectivo; se excluyen pagos pendientes, rechazados, vencidos y no generados.`,
         { width: anchoUtil(doc) },
       );
   });

@@ -5,10 +5,7 @@ const MILISEGUNDOS_DIA = 24 * 60 * 60 * 1000;
 
 const FILTRO_PAGO_COBRADO = {
   estado: "APROBADO",
-  OR: [
-    { proveedor: "EFECTIVO" },
-    { comprobanteUrl: { not: null } },
-  ],
+  proveedor: { in: ["EFECTIVO", "TRANSFERENCIA", "TARJETA"] },
 };
 
 function validarFechaISO(fechaISO) {
@@ -48,14 +45,20 @@ function fechaISOHonduras(fecha) {
 }
 
 function metodoDePago(pago) {
-  return pago.proveedor === "EFECTIVO" ? "EFECTIVO" : "TRANSFERENCIA";
+  const proveedor = String(pago.proveedor ?? "").trim().toUpperCase();
+
+  if (["EFECTIVO", "TRANSFERENCIA", "TARJETA"].includes(proveedor)) {
+    return proveedor;
+  }
+
+  return "OTRO";
 }
 
 function convertirPago(pago) {
   return {
     id: pago.id,
     codigoPago:
-      pago.codigo ?? (pago.proveedor === "EFECTIVO" ? "EFECTIVO" : "SIN-CODIGO"),
+      pago.codigo ?? (metodoDePago(pago) === "EFECTIVO" ? "EFECTIVO" : "SIN-CODIGO"),
     codigoReserva: pago.reserva.codigo,
     fechaPago: pago.fechaPago,
     metodo: metodoDePago(pago),
@@ -79,24 +82,30 @@ function resumirPagos(pagos) {
   const transferencias = detalles.filter(
     (pago) => pago.metodo === "TRANSFERENCIA",
   );
+  const tarjetas = detalles.filter((pago) => pago.metodo === "TARJETA");
   const efectivos = detalles.filter((pago) => pago.metodo === "EFECTIVO");
 
   const sumarMonto = (lista) =>
     lista.reduce((total, pago) => total + pago.monto, 0);
 
   const ingresosTransferencia = sumarMonto(transferencias);
+  const ingresosTarjeta = sumarMonto(tarjetas);
   const ingresosEfectivo = sumarMonto(efectivos);
-  const ingresosTotal = ingresosTransferencia + ingresosEfectivo;
+  const ingresosTotal =
+    ingresosTransferencia + ingresosTarjeta + ingresosEfectivo;
 
   return {
     pagos: detalles,
     transferencias,
+    tarjetas,
     efectivos,
     cantidadPagos: detalles.length,
     cantidadTransferencias: transferencias.length,
+    cantidadTarjetas: tarjetas.length,
     cantidadEfectivos: efectivos.length,
     ingresosTotal,
     ingresosTransferencia,
+    ingresosTarjeta,
     ingresosEfectivo,
     ticketPromedio: detalles.length ? ingresosTotal / detalles.length : 0,
     huespedes: detalles.reduce((total, pago) => total + pago.personas, 0),
@@ -146,6 +155,7 @@ function agruparPorDia(pagos) {
       fecha,
       cantidadPagos: 0,
       transferencias: 0,
+      tarjetas: 0,
       efectivos: 0,
       huespedes: 0,
       total: 0,
@@ -157,6 +167,8 @@ function agruparPorDia(pagos) {
 
     if (pago.metodo === "EFECTIVO") {
       actual.efectivos += pago.monto;
+    } else if (pago.metodo === "TARJETA") {
+      actual.tarjetas += pago.monto;
     } else {
       actual.transferencias += pago.monto;
     }
