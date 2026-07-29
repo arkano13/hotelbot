@@ -18,6 +18,9 @@ import {
   listarReservasQueRequierenAprobacion,
   aprobarHabitacionMasGrande,
   rechazarHabitacionMasGrande,
+  moverReservaDeHabitacion,
+  listarReservasActivasParaMover,
+  listarHabitacionesLibresParaMover,
 } from "../reservas/service.js";
 
 import { obtenerWhatsAppSocket, reiniciarSesionWhatsApp } from "../whatsapp/client.js";
@@ -215,14 +218,16 @@ export async function crearWalkIn(req, res) {
   try {
     const datos = await crearReservaWalkIn(req.body);
 
-    notificarEncargadaHabitacionOcupada({
-      numero: datos.habitacion.numero,
-      cliente: datos.cliente.nombre,
-      personas: datos.cantidadPersonas,
-      fechaSalida: datos.fechaSalida,
-    }).catch((error) =>
-      console.error("❌ Error notificando a la encargada:", error)
-    );
+    if (datos.estado === "CHECK_IN") {
+      notificarEncargadaHabitacionOcupada({
+        numero: datos.habitacion.numero,
+        cliente: datos.cliente.nombre,
+        personas: datos.cantidadPersonas,
+        fechaSalida: datos.fechaSalida,
+      }).catch((error) =>
+        console.error("❌ Error notificando a la encargada:", error)
+      );
+    }
 
     return res.json({ success: true, data: datos });
   } catch (error) {
@@ -413,6 +418,9 @@ export async function reporteMensual(req, res) {
 
 export async function fechaActualHonduras(req, res) {
   try {
+    // El reloj del celular/tablet no siempre está bien puesto (zona
+    // horaria equivocada, etc.) — la app usa esto para saber con certeza
+    // qué día es HOY en Honduras, sin depender del dispositivo.
     const fecha = new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Tegucigalpa",
     }).format(new Date());
@@ -423,16 +431,28 @@ export async function fechaActualHonduras(req, res) {
   }
 }
 
-export async function fechaActual(req, res) {
+export async function reservasActivasParaMover(req, res) {
   try {
-    // El reloj del celular/tablet no siempre está bien puesto (zona
-    // horaria equivocada, etc.) — la app usa esto para saber con certeza
-    // qué día es HOY en Honduras, sin depender del dispositivo.
-    const fecha = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Tegucigalpa",
-    }).format(new Date());
+    const datos = await listarReservasActivasParaMover();
+    return res.json({ success: true, data: datos });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
 
-    return res.json({ success: true, data: { fecha } });
+export async function habitacionesLibresParaMover(req, res) {
+  try {
+    const datos = await listarHabitacionesLibresParaMover(req.params.reservaId);
+    return res.json({ success: true, data: datos });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function moverHabitacion(req, res) {
+  try {
+    const datos = await moverReservaDeHabitacion(req.params.reservaId, req.body?.nuevaHabitacionId);
+    return res.json({ success: true, data: datos });
   } catch (error) {
     return manejarError(res, error);
   }

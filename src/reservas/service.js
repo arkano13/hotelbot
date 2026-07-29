@@ -352,6 +352,7 @@ export async function crearReservaWalkIn({
   documento,
   metodoPago,
   tipoEstadia,
+  modo,
 }) {
   const metodo = String(metodoPago ?? "EFECTIVO").trim().toUpperCase();
 
@@ -360,6 +361,17 @@ export async function crearReservaWalkIn({
   }
 
   const esPorHoras = String(tipoEstadia ?? "NOCHE").toUpperCase() === "3_HORAS";
+
+  // "OCUPAR" (por defecto): el huésped ya está físicamente ahí, la
+  // habitación queda ocupada de inmediato (CHECK_IN).
+  // "RESERVAR": se aparta la habitación para una fecha (puede ser hoy o
+  // más adelante), pero no se ocupa todavía — queda como CONFIRMADA, y
+  // el huésped hace check-in normal el día que llegue, desde "Entrada".
+  const soloReservar = String(modo ?? "OCUPAR").toUpperCase() === "RESERVAR";
+
+  if (esPorHoras && soloReservar) {
+    throw new Error('Una estadía de 3 horas no se puede "solo reservar" — siempre ocupa de inmediato.');
+  }
 
   const PRECIO_3_HORAS = 350;
   const DURACION_3_HORAS_MS = 3 * 60 * 60 * 1000;
@@ -484,10 +496,12 @@ export async function crearReservaWalkIn({
         tipoEstadia: esPorHoras ? "3_HORAS" : "NOCHE",
         precioPorNoche,
         precioTotal,
-        estado: "CHECK_IN",
+        estado: soloReservar ? "CONFIRMADA" : "CHECK_IN",
         expiraEn: null,
         observaciones: esPorHoras
           ? `Walk-in 3 horas, pago en ${metodo.toLowerCase()}`
+          : soloReservar
+          ? `Reserva creada desde la app, pago en ${metodo.toLowerCase()}`
           : `Walk-in, pago en ${metodo.toLowerCase()}`,
       },
     });
@@ -503,7 +517,7 @@ export async function crearReservaWalkIn({
     return { ...reserva, cliente, habitacion, pago };
   }).then(async (resultado) => {
     await registrarAuditoria({
-      accion: "OCUPAR_WALKIN",
+      accion: soloReservar ? "CREAR_RESERVA_DESDE_APP" : "OCUPAR_WALKIN",
       entidad: "Reserva",
       entidadId: resultado.id,
       detalle: `${resultado.codigo} · Hab. ${resultado.habitacion.numero} · ${resultado.cliente.nombre}`,
@@ -1213,4 +1227,122 @@ export async function rechazarHabitacionMasGrande(reservaId) {
   });
 
   return actualizada;
+}
+
+// Mueve una reserva activa (pendiente, confirmada, o ya con check-in) a
+// otra habitación — para corregir errores ("me equivoqué y la puse en la
+// 1, muévela a la 2") sin tener que tocar la base de datos a mano.
+export async function moverReservaDeHabitacion(reservaId, nuevaHabitacionId) {
+  const reserva = await prisma.reserva.findUnique({
+    where: { id: reservaId },
+    include: { habitacion: true, cliente: true },
+  });
+
+  if (!reserva) {
+    throw new Error("Reserva no encontrada");
+  }
+
+  if (!["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"].includes(reserva.estado)) {
+    throw new Error("Solo se pueden mover reservas activas (pendientes, confirmadas, o con check-in).");
+  }
+
+  if (reserva.habitacionId === nuevaHabitacionId) {
+    throw new Error("Esa reserva ya está en esa habitación.");
+  }
+
+  const nuevaHabitacion = await prisma.habitacion.findFirst({
+    where: { id: nuevaHabitacionId, activa: true, estado: "DISPONIBLE" },
+  });
+
+  if (!nuevaHabitacion) {
+    throw new Error("La habitación de destino no existe o está en mantenimiento.");
+  }
+
+  const capacidadNecesaria = reserva.cantidadPersonas === 4 ? 3 : reserva.cantidadPersonas;
+  if (nuevaHabitacion.capacidad < capacidadNecesaria) {
+    throw new Error(
+      `La habitación ${nuevaHabitacion.numero} no tiene capacidad suficiente para ${reserva.cantidadPersonas} persona(s).`
+    );
+  }
+
+  const conflicto = await prisma.reserva.findFirst({
+    where: {
+      id: { not: reservaId },
+      habitacionId: nuevaHabitacionId,
+      estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+      fechaEntrada: { lt: reserva.fechaSalida },
+      fechaSalida: { gt: reserva.fechaEntrada },
+    },
+  });
+
+  if (conflicto) {
+    throw new Error(`La habitación ${nuevaHabitacion.numero} ya está ocupada o reservada para esas fechas.`);
+  }
+
+  const actualizada = await prisma.reserva.update({
+    where: { id: reservaId },
+    data: { habitacionId: nuevaHabitacionId },
+    include: { habitacion: true, cliente: true },
+  });
+
+  await registrarAuditoria({
+    accion: "MOVER_HABITACION",
+    entidad: "Reserva",
+    entidadId: reserva.id,
+    detalle: `${reserva.codigo} · Hab. ${reserva.habitacion.numero} → Hab. ${nuevaHabitacion.numero} · ${reserva.cliente.nombre}`,
+  });
+
+  return actualizada;
+}
+
+// Lista las reservas activas (para elegir cuál mover), con su
+// habitación actual — igual que "Salida", sin importar la fecha.
+export async function listarReservasActivasParaMover() {
+  const reservas = await prisma.reserva.findMany({
+    where: {
+      estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+    },
+    orderBy: { fechaEntrada: "asc" },
+    include: { habitacion: true, cliente: true },
+  });
+
+  return reservas.map((reserva) => ({
+    id: reserva.id,
+    codigo: reserva.codigo,
+    estado: reserva.estado,
+    cliente: reserva.cliente.nombre,
+    habitacionActual: reserva.habitacion.numero,
+    cantidadPersonas: reserva.cantidadPersonas,
+    fechaEntrada: reserva.fechaEntrada,
+    fechaSalida: reserva.fechaSalida,
+  }));
+}
+
+// Para el modal de "mover": habitaciones libres para las MISMAS fechas
+// que ya tiene la reserva (sin contar la habitación actual).
+export async function listarHabitacionesLibresParaMover(reservaId) {
+  const reserva = await prisma.reserva.findUnique({ where: { id: reservaId } });
+
+  if (!reserva) {
+    throw new Error("Reserva no encontrada");
+  }
+
+  const habitaciones = await prisma.habitacion.findMany({
+    where: {
+      activa: true,
+      estado: "DISPONIBLE",
+      id: { not: reserva.habitacionId },
+      reservas: {
+        none: {
+          id: { not: reservaId },
+          estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+          fechaEntrada: { lt: reserva.fechaSalida },
+          fechaSalida: { gt: reserva.fechaEntrada },
+        },
+      },
+    },
+    orderBy: { numero: "asc" },
+  });
+
+  return habitaciones;
 }

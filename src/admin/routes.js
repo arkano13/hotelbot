@@ -30,6 +30,9 @@ import {
   reporteDiario,
   reporteMensual,
   fechaActualHonduras,
+  reservasActivasParaMover,
+  habitacionesLibresParaMover,
+  moverHabitacion,
   registrarDispositivoPush,
 } from "./controller.js";
 
@@ -89,6 +92,11 @@ router.get("/reportes/mensual", reporteMensual);
 // Fecha real de Honduras, para que la app nunca dependa del reloj del
 // dispositivo (tablets a veces tienen mal la zona horaria).
 router.get("/fecha-actual", fechaActualHonduras);
+
+// Mover una reserva activa a otra habitación
+router.get("/mover-habitacion/reservas", reservasActivasParaMover);
+router.get("/mover-habitacion/:reservaId/habitaciones-libres", habitacionesLibresParaMover);
+router.post("/mover-habitacion/:reservaId", moverHabitacion);
 
 // Notificaciones push
 router.post("/dispositivos", registrarDispositivoPush);
