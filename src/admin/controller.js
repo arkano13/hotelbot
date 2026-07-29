@@ -95,7 +95,7 @@ export async function hacerCheckIn(req, res) {
       req.body?.nuevaHabitacionId
     );
 
-    await notificarEncargadaHabitacionOcupada({
+    notificarEncargadaHabitacionOcupada({
       numero: datos.habitacion.numero,
       cliente: datos.cliente.nombre,
       personas: datos.cantidadPersonas,
@@ -215,7 +215,7 @@ export async function crearWalkIn(req, res) {
   try {
     const datos = await crearReservaWalkIn(req.body);
 
-    await notificarEncargadaHabitacionOcupada({
+    notificarEncargadaHabitacionOcupada({
       numero: datos.habitacion.numero,
       cliente: datos.cliente.nombre,
       personas: datos.cantidadPersonas,
