@@ -11,10 +11,23 @@ export async function listarHabitacionesConEstado() {
 
   const reservasDeHoy = await prisma.reserva.findMany({
     where: {
-      estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
-      fechaEntrada: { lt: fin },
-      fechaSalida: { gt: inicio },
+  OR: [
+    {
+      estado: "CHECK_IN",
     },
+    {
+      estado: {
+        in: ["PENDIENTE_PAGO", "CONFIRMADA"],
+      },
+      fechaEntrada: {
+        lt: fin,
+      },
+      fechaSalida: {
+        gt: inicio,
+      },
+    },
+  ],
+},
     include: {
       cliente: true,
       pago: true,
