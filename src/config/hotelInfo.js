@@ -22,7 +22,7 @@ function formatearHora(hora) {
 }
 
 const horaInicioJornada = leerHora("HOTEL_START_HOUR", 6);
-const horaCheckOut = leerHora("HOTEL_CHECKOUT_HOUR", 12);
+const horaCheckOut = leerHora("HOTEL_CHECKOUT_HOUR", 11);
 
 export const hotelInfo = {
   nombre: process.env.HOTEL_NOMBRE || "Hotel",

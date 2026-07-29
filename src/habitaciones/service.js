@@ -1,8 +1,14 @@
 import { prisma } from "../lib/prisma.js";
 import { obtenerRangoHoyHonduras, crearFechaHonduras } from "../lib/fecha.js";
+import { hotelInfo } from "../config/hotelInfo.js";
 
 export async function listarHabitacionesConEstado() {
-  const { inicio, fin } = obtenerRangoHoyHonduras();
+  const { fin } = obtenerRangoHoyHonduras();
+  const ahora = new Date();
+  const salidaMinimaConfirmada = new Date(
+    ahora.getTime() -
+      hotelInfo.horarios.horaCheckOut * 60 * 60 * 1000
+  );
 
   const habitaciones = await prisma.habitacion.findMany({
     where: { activa: true },
@@ -11,23 +17,25 @@ export async function listarHabitacionesConEstado() {
 
   const reservasDeHoy = await prisma.reserva.findMany({
     where: {
-  OR: [
-    {
-      estado: "CHECK_IN",
+      OR: [
+        {
+          estado: "CHECK_IN",
+        },
+        {
+          estado: "CONFIRMADA",
+          fechaEntrada: { lt: fin },
+          fechaSalida: { gt: salidaMinimaConfirmada },
+        },
+        {
+          estado: "PENDIENTE_PAGO",
+          fechaEntrada: { lt: fin },
+          OR: [
+            { expiraEn: null },
+            { expiraEn: { gt: ahora } },
+          ],
+        },
+      ],
     },
-    {
-      estado: {
-        in: ["PENDIENTE_PAGO", "CONFIRMADA"],
-      },
-      fechaEntrada: {
-        lt: fin,
-      },
-      fechaSalida: {
-        gt: inicio,
-      },
-    },
-  ],
-},
     include: {
       cliente: true,
       pago: true,
