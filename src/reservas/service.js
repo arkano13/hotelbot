@@ -353,26 +353,33 @@ export async function crearReservaWalkIn({
   metodoPago,
   tipoEstadia,
   modo,
+  yaPago,
 }) {
+  // "OCUPAR" (por defecto): el huésped ya está físicamente ahí, la
+  // habitación queda ocupada de inmediato (CHECK_IN), y siempre se cobra
+  // al momento.
+  // "RESERVAR": se aparta la habitación para una fecha (puede ser hoy o
+  // más adelante), sin ocuparla todavía. Puede venir:
+  //   - yaPago=true: se cobró de una vez -> queda CONFIRMADA, nunca vence.
+  //   - yaPago=false (por defecto): paga hasta que llegue -> queda
+  //     PENDIENTE_PAGO con 24 horas para llegar (igual que las reservas
+  //     de WhatsApp en efectivo), si no, se libera sola.
+  const soloReservar = String(modo ?? "OCUPAR").toUpperCase() === "RESERVAR";
+  const reservaYaPagada = !soloReservar || Boolean(yaPago);
+
   const metodo = String(metodoPago ?? "EFECTIVO").trim().toUpperCase();
 
-  if (!["EFECTIVO", "TRANSFERENCIA", "TARJETA"].includes(metodo)) {
+  if (reservaYaPagada && !["EFECTIVO", "TRANSFERENCIA", "TARJETA"].includes(metodo)) {
     throw new Error('El método de pago debe ser "efectivo", "transferencia" o "tarjeta"');
   }
 
   const esPorHoras = String(tipoEstadia ?? "NOCHE").toUpperCase() === "3_HORAS";
 
-  // "OCUPAR" (por defecto): el huésped ya está físicamente ahí, la
-  // habitación queda ocupada de inmediato (CHECK_IN).
-  // "RESERVAR": se aparta la habitación para una fecha (puede ser hoy o
-  // más adelante), pero no se ocupa todavía — queda como CONFIRMADA, y
-  // el huésped hace check-in normal el día que llegue, desde "Entrada".
-  const soloReservar = String(modo ?? "OCUPAR").toUpperCase() === "RESERVAR";
-
   if (esPorHoras && soloReservar) {
     throw new Error('Una estadía de 3 horas no se puede "solo reservar" — siempre ocupa de inmediato.');
   }
 
+  const HORAS_PARA_LLEGAR = 24;
   const PRECIO_3_HORAS = 350;
   const DURACION_3_HORAS_MS = 3 * 60 * 60 * 1000;
 
@@ -496,24 +503,39 @@ export async function crearReservaWalkIn({
         tipoEstadia: esPorHoras ? "3_HORAS" : "NOCHE",
         precioPorNoche,
         precioTotal,
-        estado: soloReservar ? "CONFIRMADA" : "CHECK_IN",
-        expiraEn: null,
+        estado: !soloReservar ? "CHECK_IN" : (reservaYaPagada ? "CONFIRMADA" : "PENDIENTE_PAGO"),
+        // Si es "solo reservar" y todavía no pagó, tiene 24 horas para
+        // llegar (igual que las reservas de WhatsApp en efectivo). Si ya
+        // pagó, o si ya está ocupando, no vence nunca.
+        expiraEn:
+          soloReservar && !reservaYaPagada
+            ? new Date(Date.now() + HORAS_PARA_LLEGAR * 60 * 60 * 1000)
+            : null,
         observaciones: esPorHoras
           ? `Walk-in 3 horas, pago en ${metodo.toLowerCase()}`
-          : soloReservar
-          ? `Reserva creada desde la app, pago en ${metodo.toLowerCase()}`
-          : `Walk-in, pago en ${metodo.toLowerCase()}`,
+          : !soloReservar
+          ? `Walk-in, pago en ${metodo.toLowerCase()}`
+          : reservaYaPagada
+          ? `Reserva creada desde la app, pagada en ${metodo.toLowerCase()}`
+          : "Reserva creada desde la app, sin pagar todavía — paga al llegar",
       },
     });
-    const pago = await tx.pago.create({
-      data: {
-        reservaId: reserva.id,
-        monto: precioTotal,
-        proveedor: metodo,
-        estado: "APROBADO",
-        fechaPago: new Date(),
-      },
-    });
+
+    // Solo se registra el pago si ya está pagada (ocupar siempre cobra;
+    // reservar solo si eligieron "ya pagó").
+    let pago = null;
+    if (reservaYaPagada) {
+      pago = await tx.pago.create({
+        data: {
+          reservaId: reserva.id,
+          monto: precioTotal,
+          proveedor: metodo,
+          estado: "APROBADO",
+          fechaPago: new Date(),
+        },
+      });
+    }
+
     return { ...reserva, cliente, habitacion, pago };
   }).then(async (resultado) => {
     await registrarAuditoria({
@@ -926,10 +948,18 @@ export async function registrarCheckInPorHabitacion(
       ...(pendienteDePago
         ? {
             pago: {
-              update: {
-                estado: "APROBADO",
-                proveedor: metodo,
-                fechaPago: new Date(),
+              upsert: {
+                create: {
+                  monto: reserva.precioTotal,
+                  proveedor: metodo,
+                  estado: "APROBADO",
+                  fechaPago: new Date(),
+                },
+                update: {
+                  estado: "APROBADO",
+                  proveedor: metodo,
+                  fechaPago: new Date(),
+                },
               },
             },
           }

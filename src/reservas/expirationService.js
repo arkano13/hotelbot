@@ -147,10 +147,7 @@ export async function procesarCheckoutsAutomaticos() {
 
   const reservasParaCheckout = await prisma.reserva.findMany({
     where: {
-      estado: {
-        in: ["CHECK_IN", "CONFIRMADA"],
-      },
-      tipoEstadia: "NOCHE",
+      estado: "CHECK_IN",
       fechaSalida: {
         lte: finDelDiaEnHonduras,
       },
@@ -158,7 +155,6 @@ export async function procesarCheckoutsAutomaticos() {
     select: {
       id: true,
       codigo: true,
-      estado: true,
     },
   });
 
@@ -168,10 +164,7 @@ export async function procesarCheckoutsAutomaticos() {
     const resultado = await prisma.reserva.updateMany({
       where: {
         id: reserva.id,
-        estado: {
-          in: ["CHECK_IN", "CONFIRMADA"],
-        },
-        tipoEstadia: "NOCHE",
+        estado: "CHECK_IN",
       },
       data: {
         estado: "CHECK_OUT",
@@ -180,11 +173,7 @@ export async function procesarCheckoutsAutomaticos() {
 
     if (resultado.count > 0) {
       cantidadCheckout++;
-      const detalle =
-        reserva.estado === "CONFIRMADA"
-          ? "reserva confirmada sin check-in"
-          : "huésped con check-in";
-      console.log(`🚪 Checkout automático (${detalle}): ${reserva.codigo}`);
+      console.log(`🚪 Checkout automático: ${reserva.codigo}`);
     }
   }
 
