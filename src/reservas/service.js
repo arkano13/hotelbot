@@ -837,14 +837,13 @@ export async function cancelarReservaPorId(reservaId) {
 // reservada, muestra qué otras habitaciones de la misma capacidad están
 // libres AHORA, por si se quiere reasignar al momento de la entrada.
 export async function listarAlternativasParaCheckIn(habitacionId) {
-  const { inicio, fin } = obtenerRangoHoyHonduras();
+  const { fin } = obtenerRangoHoyHonduras();
 
   const reserva = await prisma.reserva.findFirst({
     where: {
       habitacionId,
       estado: { in: ["CONFIRMADA", "PENDIENTE_PAGO"] },
       fechaEntrada: { lt: fin },
-      fechaSalida: { gt: inicio },
     },
     orderBy: { fechaEntrada: "asc" },
   });
@@ -887,14 +886,13 @@ export async function registrarCheckInPorHabitacion(
   metodoPago,
   nuevaHabitacionId
 ) {
-  const { inicio, fin } = obtenerRangoHoyHonduras();
+  const { fin } = obtenerRangoHoyHonduras();
 
   const reserva = await prisma.reserva.findFirst({
     where: {
       habitacionId,
       estado: { in: ["CONFIRMADA", "PENDIENTE_PAGO"] },
       fechaEntrada: { lt: fin },
-      fechaSalida: { gt: inicio },
     },
     orderBy: { fechaEntrada: "asc" },
     include: { habitacion: true, cliente: true, pago: true },
