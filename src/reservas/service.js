@@ -744,13 +744,18 @@ export async function listarHabitacionesDisponiblesWalkIn({ fechaEntrada, fechaS
 }
 
 export async function listarReservasParaCheckIn() {
-  const { inicio, fin } = obtenerRangoHoyHonduras();
+  const { fin } = obtenerRangoHoyHonduras();
 
   const reservas = await prisma.reserva.findMany({
     where: {
       estado: { in: ["CONFIRMADA", "PENDIENTE_PAGO"] },
+      // Entrada de hoy, o de días anteriores que nunca llegaron a hacer
+      // check-in — así no desaparecen solas de la lista si nadie las
+      // procesó a tiempo. No hay límite por fecha de salida: mientras
+      // sigan en estos dos estados (es decir, todavía no hicieron
+      // check-in), se siguen mostrando sin importar si su salida
+      // original ya pasó.
       fechaEntrada: { lt: fin },
-      fechaSalida: { gt: inicio },
     },
     orderBy: { fechaEntrada: "asc" },
     include: { habitacion: true, cliente: true, pago: true },
