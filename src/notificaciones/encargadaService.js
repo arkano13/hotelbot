@@ -27,24 +27,29 @@ function dentroDeHorarioEncargada() {
   return horaActual >= inicio && horaActual < fin;
 }
 
-function enviarPorWhatsApp(telefono, texto) {
+// Devuelve true SOLO si el mensaje de verdad se mandó. Antes, esta
+// función no confirmaba nada — si WhatsApp estaba a medio reconectar
+// justo en ese momento, el mensaje se perdía en silencio y el sistema
+// igual lo marcaba como "enviado", sin volver a intentarlo nunca.
+async function enviarPorWhatsApp(telefono, texto) {
   try {
     const socket = obtenerWhatsAppSocket();
-    if (socket && telefono) {
-      return socket
-        .sendMessage(`${telefono}@s.whatsapp.net`, { text: texto })
-        .catch(() => {});
+    if (!socket || !telefono) {
+      return false;
     }
-  } catch {
-    // Si WhatsApp no está conectado en este momento, no es motivo para
-    // fallar — el mensaje ya se puede haber guardado como pendiente.
+
+    await socket.sendMessage(`${telefono}@s.whatsapp.net`, { text: texto });
+    return true;
+  } catch (error) {
+    console.error("❌ No se pudo mandar el WhatsApp a la encargada (se reintentará):", error.message);
+    return false;
   }
 }
 
 // Notifica a la encargada de habitaciones (ENCARGADA_PHONE) de que una
-// habitación quedó ocupada. Si es dentro de su horario, se manda de una
-// vez; si no, se guarda para mandarse sola apenas empiece su siguiente
-// turno.
+// habitación quedó ocupada. Si es dentro de su horario, se intenta mandar
+// de una vez; si falla (o está fuera de horario), se guarda como
+// pendiente para reintentarse — así nunca se pierde en silencio.
 export async function notificarEncargadaHabitacionOcupada({
   numero,
   cliente,
@@ -69,8 +74,10 @@ export async function notificarEncargadaHabitacionOcupada({
     `Sale: ${fechaSalidaTexto}`;
 
   if (dentroDeHorarioEncargada()) {
-    enviarPorWhatsApp(encargadaPhone, texto);
-    return;
+    const enviado = await enviarPorWhatsApp(encargadaPhone, texto);
+    if (enviado) return;
+    // Si estaba en horario pero el envío falló (WhatsApp reconectando,
+    // etc.), no se pierde — se guarda pendiente para el próximo minuto.
   }
 
   await prisma.notificacionEncargadaPendiente
@@ -86,8 +93,9 @@ export async function notificarEncargadaHabitacionOcupada({
 }
 
 // Se llama cada minuto desde el scheduler. Si ya estamos dentro del
-// horario de la encargada, manda todo lo que se quedó pendiente de fuera
-// de turno.
+// horario de la encargada, intenta mandar todo lo pendiente — solo se
+// marca como enviado lo que de verdad se confirmó; lo que falla se
+// queda pendiente para reintentarse el próximo minuto.
 export async function procesarNotificacionesPendientesEncargada() {
   if (!dentroDeHorarioEncargada()) return;
 
@@ -98,8 +106,14 @@ export async function procesarNotificacionesPendientesEncargada() {
 
   if (pendientes.length === 0) return;
 
+  let cantidadEnviada = 0;
+
   for (const pendiente of pendientes) {
-    enviarPorWhatsApp(pendiente.telefono, pendiente.mensaje);
+    const enviado = await enviarPorWhatsApp(pendiente.telefono, pendiente.mensaje);
+
+    if (!enviado) {
+      continue; // se queda enviada=false, se reintenta el próximo minuto
+    }
 
     await prisma.notificacionEncargadaPendiente
       .update({
@@ -107,9 +121,13 @@ export async function procesarNotificacionesPendientesEncargada() {
         data: { enviada: true, enviadaEn: new Date() },
       })
       .catch(() => {});
+
+    cantidadEnviada++;
   }
 
-  console.log(
-    `🛏️ ${pendientes.length} notificación(es) pendiente(s) de la encargada enviadas al empezar su turno.`
-  );
+  if (cantidadEnviada > 0) {
+    console.log(
+      `🛏️ ${cantidadEnviada}/${pendientes.length} notificación(es) pendiente(s) de la encargada enviadas.`
+    );
+  }
 }

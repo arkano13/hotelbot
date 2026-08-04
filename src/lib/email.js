@@ -8,11 +8,18 @@ function obtenerTransportador() {
   }
 
   transportador = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_APP_PASSWORD,
     },
+    // Railway tiene la salida por IPv6 desactivada por defecto — si Node
+    // intenta conectar por ahí primero, se cuelga hasta hacer timeout en
+    // vez de caer directo a IPv4. Forzarlo evita ese cuelgue.
+    family: 4,
+    connectionTimeout: 20000,
   });
 
   return transportador;
