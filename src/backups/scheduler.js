@@ -34,7 +34,9 @@ function obtenerFechaHoraHonduras() {
   };
 }
 
-async function enviarBackup(fechaISO) {
+// Exportada para poder dispararla manualmente (botón/endpoint), además
+// del envío automático de los domingos.
+export async function enviarBackup(fechaISO) {
   try {
     const backup = await generarBackupCompleto();
 
@@ -47,6 +49,7 @@ async function enviarBackup(fechaISO) {
     console.log(`✅ Backup semanal enviado por correo (${fechaISO})`);
   } catch (error) {
     console.error("❌ Error enviando backup semanal:", error);
+    throw error;
   }
 }
 

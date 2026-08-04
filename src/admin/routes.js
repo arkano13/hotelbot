@@ -34,6 +34,7 @@ import {
   habitacionesLibresParaMover,
   moverHabitacion,
   registrarDispositivoPush,
+  backupManual,
 } from "./controller.js";
 
 const router = Router();
@@ -100,5 +101,8 @@ router.post("/mover-habitacion/:reservaId", moverHabitacion);
 
 // Notificaciones push
 router.post("/dispositivos", registrarDispositivoPush);
+
+// Backup manual por correo (además del automático de los domingos)
+router.get("/backup-manual", backupManual);
 
 export default router;

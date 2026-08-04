@@ -46,6 +46,7 @@ import {
 import { registrarDispositivo } from "../notificaciones/service.js";
 import { notificarEncargadaHabitacionOcupada } from "../notificaciones/encargadaService.js";
 import { enviarReporteDiario, enviarReporteMensual } from "../reportes/Scheduler.js";
+import { enviarBackup } from "../backups/scheduler.js";
 
 function manejarError(res, error) {
   return res.status(400).json({
@@ -330,10 +331,6 @@ function notificarClientePorWhatsApp(telefono, texto) {
   }
 }
 
-// Avisa a la encargada de habitaciones (número configurado en
-// ENCARGADA_PHONE) cada vez que una habitación queda ocupada de verdad
-// — ya sea por walk-in o porque alguien con reserva de WhatsApp llegó
-// (Entrada). Si no hay número configurado, simplemente no manda nada.
 export async function reservasQueRequierenAprobacion(req, res) {
   try {
     const datos = await listarReservasQueRequierenAprobacion();
@@ -453,6 +450,19 @@ export async function moverHabitacion(req, res) {
   try {
     const datos = await moverReservaDeHabitacion(req.params.reservaId, req.body?.nuevaHabitacionId);
     return res.json({ success: true, data: datos });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function backupManual(req, res) {
+  try {
+    const fechaISO = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Tegucigalpa",
+    }).format(new Date());
+
+    await enviarBackup(fechaISO);
+    return res.json({ success: true, message: "Backup enviado por correo." });
   } catch (error) {
     return manejarError(res, error);
   }
