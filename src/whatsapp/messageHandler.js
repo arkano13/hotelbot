@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import crypto from "crypto";
 import pino from "pino";
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
