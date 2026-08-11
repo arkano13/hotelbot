@@ -36,6 +36,43 @@ function calcularNoches(fechaEntrada, fechaSalida) {
   );
 }
 
+// Arma la misma respuesta que ya devolvería crear_reserva, pero a partir
+// de una reserva que YA existe — se usa cuando la IA intenta crear la
+// reserva por segunda vez en la misma conversación (por ejemplo, ante un
+// simple "ok" o "gracias" después de ya haberla creado). En vez de
+// crear una reserva duplicada, se le devuelve la misma de siempre.
+function respuestaDeReservaExistente(reserva) {
+  const base = {
+    codigo: reserva.codigo,
+    nombreCliente: reserva.cliente?.nombre ?? null,
+    fechaEntrada: formatearFecha(reserva.fechaEntrada),
+    fechaSalida: formatearFecha(reserva.fechaSalida),
+    personas: reserva.cantidadPersonas,
+    noches: reserva.cantidadNoches,
+    precioTotal: Number(reserva.precioTotal),
+    moneda: "HNL",
+    estado: reserva.estado,
+    requiereAprobacion: reserva.requiereAprobacion,
+    yaExistia: true,
+  };
+
+  if (reserva.pago?.proveedor === "EFECTIVO") {
+    return { ...base, metodoPago: "efectivo", horasLimite: 24 };
+  }
+
+  return {
+    ...base,
+    precioPorNoche: Number(reserva.precioPorNoche),
+    metodoPago: "transferencia",
+    datosPago: {
+      banco: hotelInfo.pagos.banco,
+      titular: hotelInfo.pagos.titular,
+      tipoCuenta: hotelInfo.pagos.tipoCuenta,
+      numeroCuenta: hotelInfo.pagos.numeroCuenta,
+    },
+  };
+}
+
 export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
   const { conversationId, telefono, socket, jid } = contexto;
 
@@ -112,6 +149,23 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
       }
 
       const conversacion = await obtenerConversacionPorId(conversationId);
+
+      // Protección contra duplicados: si ya se creó una reserva en esta
+      // misma conversación (quedó en ESPERANDO_PAGO o COMPLETADO), un
+      // segundo intento de crear_reserva NUNCA debe crear otra — se
+      // devuelve la misma que ya existe. Esto puede pasar si el cliente
+      // manda un simple "ok"/"gracias" después de confirmada, y la IA
+      // interpreta eso como que hay que reservar de nuevo.
+      if (
+        conversacion.reservaId &&
+        ["ESPERANDO_PAGO", "COMPLETADO"].includes(conversacion.step)
+      ) {
+        const reservaExistente = await obtenerReservaMasRecientePorTelefono(telefono);
+
+        if (reservaExistente && reservaExistente.id === conversacion.reservaId) {
+          return respuestaDeReservaExistente(reservaExistente);
+        }
+      }
 
       if (!conversacion.ultimaDisponibilidadAt) {
         throw new Error(
@@ -404,6 +458,28 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
       }
 
       const conversacion = await obtenerConversacionPorId(conversationId);
+
+      // Misma protección contra duplicados que en crear_reserva.
+      if (
+        conversacion.reservaIds &&
+        Array.isArray(conversacion.reservaIds) &&
+        conversacion.reservaIds.length > 0 &&
+        ["ESPERANDO_PAGO", "COMPLETADO"].includes(conversacion.step)
+      ) {
+        const reservaExistente = await obtenerReservaMasRecientePorTelefono(telefono);
+
+        if (
+          reservaExistente &&
+          conversacion.reservaIds.includes(reservaExistente.id)
+        ) {
+          return {
+            cantidadReservas: conversacion.reservaIds.length,
+            codigos: [reservaExistente.codigo],
+            yaExistia: true,
+            mensaje: "Estas reservas ya se habían creado antes en esta misma conversación.",
+          };
+        }
+      }
 
       if (!conversacion.ultimaDisponibilidadAt) {
         throw new Error(
