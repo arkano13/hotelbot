@@ -1,20 +1,20 @@
 import { prisma } from "../lib/prisma.js";
 import { registrarAuditoria } from "../auditoria/service.js";
 import { obtenerRangoHoyHonduras, crearFechaHonduras, ajustarEntradaWalkInMadrugada } from "../lib/fecha.js";
-
+ 
 import { crearOActualizarCliente } from "../clientes/service.js";
-
+ 
 import {
   consultarDisponibilidad,
   consultarDisponibilidadMultiple,
 } from "../disponibilidad/service.js";
-
+ 
 import { obtenerTarifaPorPersonas } from "../tarifas/service.js";
 import { enviarNotificacionATodos } from "../notificaciones/service.js";
-
+ 
 const MINUTOS_EXPIRACION = 30;
 const MINUTOS_EXPIRACION_EFECTIVO = 24 * 60;
-
+ 
 async function ejecutarTransaccionSerializable(operacion, intentosMaximos = 3) {
   for (let intento = 1; intento <= intentosMaximos; intento++) {
     try {
@@ -25,46 +25,46 @@ async function ejecutarTransaccionSerializable(operacion, intentosMaximos = 3) {
       });
     } catch (error) {
       const conflictoConcurrente = error?.code === "P2034";
-
+ 
       if (!conflictoConcurrente || intento === intentosMaximos) {
         throw error;
       }
     }
   }
-
+ 
   throw new Error("No se pudo completar la reserva por concurrencia.");
 }
-
+ 
 function crearFecha(fecha) {
   return crearFechaHonduras(fecha);
 }
-
+ 
 function calcularNoches(fechaEntrada, fechaSalida) {
   const diferencia =
     fechaSalida.getTime() - fechaEntrada.getTime();
-
+ 
   return Math.round(
     diferencia / (1000 * 60 * 60 * 24)
   );
 }
-
+ 
 function generarCodigoReserva() {
   const anio = new Date().getFullYear();
-
+ 
   const numero = Math.floor(
     100000 + Math.random() * 900000
   );
-
+ 
   return `RES-${anio}-${numero}`;
 }
-
+ 
 async function generarCodigoUnico(tx = prisma) {
   let codigo;
   let existente;
-
+ 
   do {
     codigo = generarCodigoReserva();
-
+ 
     existente = await tx.reserva.findUnique({
       where: {
         codigo,
@@ -74,10 +74,10 @@ async function generarCodigoUnico(tx = prisma) {
       },
     });
   } while (existente);
-
+ 
   return codigo;
 }
-
+ 
 function validarDatosReserva({
   nombre,
   telefono,
@@ -95,25 +95,25 @@ function validarDatosReserva({
   const documentoLimpio = String(documento ?? "").trim();
   const metodoPagoLimpio = String(metodoPago ?? "").trim().toUpperCase();
   const cantidadPersonas = Number(personas);
-
+ 
   if (!nombreLimpio) {
     throw new Error(
       "El nombre y apellido son obligatorios"
     );
   }
-
+ 
   if (telefonoObligatorio && !telefonoLimpio) {
     throw new Error(
       "El teléfono es obligatorio"
     );
   }
-
+ 
   if (documentoObligatorio && !documentoLimpio) {
     throw new Error(
       "El número de identidad es obligatorio"
     );
   }
-
+ 
   if (metodoPagoObligatorio || metodoPagoLimpio) {
     if (!["EFECTIVO", "TRANSFERENCIA"].includes(metodoPagoLimpio)) {
       throw new Error(
@@ -121,13 +121,13 @@ function validarDatosReserva({
       );
     }
   }
-
+ 
   if (!fechaEntrada || !fechaSalida) {
     throw new Error(
       "Las fechas de entrada y salida son obligatorias"
     );
   }
-
+ 
   if (
     !Number.isInteger(cantidadPersonas) ||
     cantidadPersonas < 1
@@ -136,23 +136,23 @@ function validarDatosReserva({
       "La cantidad de personas no es válida"
     );
   }
-
+ 
   const entrada = crearFecha(fechaEntrada);
   const salida = crearFecha(fechaSalida);
-
+ 
   if (
     Number.isNaN(entrada.getTime()) ||
     Number.isNaN(salida.getTime())
   ) {
     throw new Error("Las fechas no son válidas");
   }
-
+ 
   if (salida <= entrada) {
     throw new Error(
       "La fecha de salida debe ser posterior a la entrada"
     );
   }
-
+ 
   return {
     nombreLimpio,
     telefonoLimpio,
@@ -163,7 +163,7 @@ function validarDatosReserva({
     salida,
   };
 }
-
+ 
 export async function crearReservaTemporal({
   nombre,
   telefono,
@@ -192,13 +192,13 @@ export async function crearReservaTemporal({
     documento,
     metodoPago,
   });
-
+ 
   if (cantidadPersonas > 4) {
     throw new Error(
       "Para más de 4 personas se deben crear varias habitaciones"
     );
   }
-
+ 
   const disponibilidad =
     await consultarDisponibilidad({
       fechaEntrada,
@@ -206,7 +206,7 @@ export async function crearReservaTemporal({
       personas: cantidadPersonas,
       habitacionPreferida,
     });
-
+ 
   if (
     !disponibilidad.disponible ||
     !disponibilidad.habitacion
@@ -215,42 +215,42 @@ export async function crearReservaTemporal({
       "No hay habitaciones disponibles para esas fechas"
     );
   }
-
+ 
   const tarifa =
     await obtenerTarifaPorPersonas(
       cantidadPersonas
     );
-
+ 
   const cantidadNoches = calcularNoches(
     entrada,
     salida
   );
-
+ 
   const precioPorNoche = Number(
     tarifa.precio
   );
-
+ 
   const precioTotal =
     precioPorNoche * cantidadNoches;
-
+ 
   const cliente =
     await crearOActualizarCliente({
       nombre: nombreLimpio,
       telefono: telefonoLimpio,
       documento: documentoLimpio,
     });
-
+ 
   const expiraEn = new Date(
     Date.now() +
       (metodo === "EFECTIVO" ? MINUTOS_EXPIRACION_EFECTIVO : MINUTOS_EXPIRACION) * 60 * 1000
   );
-
+ 
   return ejecutarTransaccionSerializable(async (tx) => {
     const conflicto = await tx.reserva.findFirst({
       where: {
         habitacionId:
           disponibilidad.habitacion.id,
-
+ 
         estado: {
           in: [
             "PENDIENTE_PAGO",
@@ -258,51 +258,51 @@ export async function crearReservaTemporal({
             "CHECK_IN",
           ],
         },
-
+ 
         fechaEntrada: {
           lt: salida,
         },
-
+ 
         fechaSalida: {
           gt: entrada,
         },
       },
-
+ 
       select: {
         id: true,
       },
     });
-
+ 
     if (conflicto) {
       throw new Error(
         "La habitación dejó de estar disponible. Intenta nuevamente"
       );
     }
-
+ 
     const codigo = await generarCodigoUnico(tx);
-
+ 
     const reserva = await tx.reserva.create({
       data: {
         codigo,
         clienteId: cliente.id,
-
+ 
         habitacionId:
           disponibilidad.habitacion.id,
-
+ 
         fechaEntrada: entrada,
         fechaSalida: salida,
-
+ 
         cantidadPersonas,
         cantidadNoches,
-
+ 
         precioPorNoche,
         precioTotal,
-
+ 
         estado: "PENDIENTE_PAGO",
         expiraEn,
-
+ 
         requiereAprobacion: disponibilidad.esHabitacionMasGrande,
-
+ 
         observaciones: observaciones
           ? String(observaciones).trim()
           : null,
@@ -312,7 +312,7 @@ export async function crearReservaTemporal({
         cliente: true,
       },
     });
-
+ 
     const pago = await tx.pago.create({
       data: {
         reservaId: reserva.id,
@@ -321,7 +321,7 @@ export async function crearReservaTemporal({
         estado: metodo === "EFECTIVO" ? "PENDIENTE" : "NO_GENERADO",
       },
     });
-
+ 
     return {
       ...reserva,
       cliente,
@@ -337,11 +337,11 @@ export async function crearReservaTemporal({
         datos: { tipo: "aprobacion_habitacion" },
       });
     }
-
+ 
     return resultado;
   });
 }
-
+ 
 export async function crearReservaWalkIn({
   nombre,
   telefono,
@@ -366,25 +366,25 @@ export async function crearReservaWalkIn({
   //     de WhatsApp en efectivo), si no, se libera sola.
   const soloReservar = String(modo ?? "OCUPAR").toUpperCase() === "RESERVAR";
   const reservaYaPagada = !soloReservar || Boolean(yaPago);
-
+ 
   const metodo = String(metodoPago ?? "EFECTIVO").trim().toUpperCase();
-
+ 
   if (reservaYaPagada && !["EFECTIVO", "TRANSFERENCIA", "TARJETA"].includes(metodo)) {
     throw new Error('El método de pago debe ser "efectivo", "transferencia" o "tarjeta"');
   }
-
+ 
   const esPorHoras = String(tipoEstadia ?? "NOCHE").toUpperCase() === "3_HORAS";
-
+ 
   if (esPorHoras && soloReservar) {
     throw new Error('Una estadía de 3 horas no se puede "solo reservar" — siempre ocupa de inmediato.');
   }
-
+ 
   const HORAS_PARA_LLEGAR = 24;
   const PRECIO_3_HORAS = 350;
   const DURACION_3_HORAS_MS = 3 * 60 * 60 * 1000;
-
+ 
   let nombreLimpio, telefonoLimpio, documentoLimpio, cantidadPersonas, entrada, salida;
-
+ 
   if (esPorHoras) {
     // Estadía de 3 horas: entra AHORA mismo (no tiene sentido agendarla
     // para otro día), sale exactamente 3 horas después. No usa noches ni
@@ -393,12 +393,12 @@ export async function crearReservaWalkIn({
     telefonoLimpio = String(telefono ?? "").trim();
     documentoLimpio = String(documento ?? "").trim();
     cantidadPersonas = Number(personas);
-
+ 
     if (!nombreLimpio) throw new Error("El nombre y apellido son obligatorios");
     if (!Number.isInteger(cantidadPersonas) || cantidadPersonas < 1) {
       throw new Error("La cantidad de personas no es válida");
     }
-
+ 
     entrada = new Date();
     salida = new Date(entrada.getTime() + DURACION_3_HORAS_MS);
   } else {
@@ -408,7 +408,7 @@ export async function crearReservaWalkIn({
     const fechasAjustadas = ajustarEntradaWalkInMadrugada(fechaEntrada, fechaSalida);
     fechaEntrada = fechasAjustadas.fechaEntrada;
     fechaSalida = fechasAjustadas.fechaSalida;
-
+ 
     const datos = validarDatosReserva({
       nombre,
       telefono,
@@ -420,16 +420,16 @@ export async function crearReservaWalkIn({
       documentoObligatorio: false,
       metodoPagoObligatorio: false,
     });
-
+ 
     ({ nombreLimpio, telefonoLimpio, documentoLimpio, cantidadPersonas, entrada, salida } = datos);
   }
-
+ 
   if (cantidadPersonas > 4) {
     throw new Error("Para más de 4 personas se necesitan varias habitaciones.");
   }
-
+ 
   let habitacion;
-
+ 
   if (habitacionId) {
     habitacion = await prisma.habitacion.findFirst({
       where: { id: habitacionId, activa: true, estado: "DISPONIBLE" },
@@ -442,12 +442,12 @@ export async function crearReservaWalkIn({
     });
     habitacion = disponibles[0];
   }
-
+ 
   const capacidadMinimaNecesaria = cantidadPersonas === 4 ? 3 : cantidadPersonas;
   if (!habitacion || habitacion.capacidad < capacidadMinimaNecesaria) {
     throw new Error("La habitación seleccionada no está disponible.");
   }
-
+ 
   const conflicto = await prisma.reserva.findFirst({
     where: {
       habitacionId: habitacion.id,
@@ -457,9 +457,9 @@ export async function crearReservaWalkIn({
     },
   });
   if (conflicto) throw new Error("La habitación dejó de estar disponible.");
-
+ 
   let cantidadNoches, precioPorNoche, precioTotal;
-
+ 
   if (esPorHoras) {
     cantidadNoches = 0;
     precioPorNoche = PRECIO_3_HORAS;
@@ -470,11 +470,11 @@ export async function crearReservaWalkIn({
     precioPorNoche = Number(tarifa.precio);
     precioTotal = precioPorNoche * cantidadNoches;
   }
-
+ 
   const cliente = telefonoLimpio
     ? await crearOActualizarCliente({ nombre: nombreLimpio, telefono: telefonoLimpio, documento: documentoLimpio })
     : await prisma.cliente.create({ data: { nombre: nombreLimpio, telefono: null, documento: documentoLimpio || null } });
-
+ 
   return ejecutarTransaccionSerializable(async (tx) => {
     const conflictoDentroDeTransaccion = await tx.reserva.findFirst({
       where: {
@@ -485,11 +485,11 @@ export async function crearReservaWalkIn({
       },
       select: { id: true },
     });
-
+ 
     if (conflictoDentroDeTransaccion) {
       throw new Error("La habitación dejó de estar disponible.");
     }
-
+ 
     const codigo = await generarCodigoUnico(tx);
     const reserva = await tx.reserva.create({
       data: {
@@ -520,7 +520,7 @@ export async function crearReservaWalkIn({
           : "Reserva creada desde la app, sin pagar todavía — paga al llegar",
       },
     });
-
+ 
     // Solo se registra el pago si ya está pagada (ocupar siempre cobra;
     // reservar solo si eligieron "ya pagó").
     let pago = null;
@@ -535,7 +535,7 @@ export async function crearReservaWalkIn({
         },
       });
     }
-
+ 
     return { ...reserva, cliente, habitacion, pago };
   }).then(async (resultado) => {
     await registrarAuditoria({
@@ -544,11 +544,11 @@ export async function crearReservaWalkIn({
       entidadId: resultado.id,
       detalle: `${resultado.codigo} · Hab. ${resultado.habitacion.numero} · ${resultado.cliente.nombre}`,
     });
-
+ 
     return resultado;
   });
 }
-
+ 
 export async function crearReservasMultiples({
   nombre,
   telefono,
@@ -575,20 +575,20 @@ export async function crearReservasMultiples({
     documento,
     metodoPago,
   });
-
+ 
   if (cantidadPersonas < 2) {
     throw new Error(
       "Las reservas múltiples son para grupos de 2 personas o más"
     );
   }
-
+ 
   const disponibilidad =
     await consultarDisponibilidadMultiple({
       fechaEntrada,
       fechaSalida,
       personas: cantidadPersonas,
     });
-
+ 
   if (
     !disponibilidad.disponible ||
     disponibilidad.habitaciones.length === 0
@@ -597,19 +597,19 @@ export async function crearReservasMultiples({
       "No hay suficientes habitaciones disponibles para esas fechas"
     );
   }
-
+ 
   const cantidadNoches = calcularNoches(
     entrada,
     salida
   );
-
+ 
   const cliente =
     await crearOActualizarCliente({
       nombre: nombreLimpio,
       telefono: telefonoLimpio,
       documento: documentoLimpio,
     });
-
+ 
   const expiraEn = new Date(
     Date.now() +
       (metodo === "EFECTIVO"
@@ -618,10 +618,10 @@ export async function crearReservasMultiples({
         60 *
         1000
   );
-
+ 
   return ejecutarTransaccionSerializable(async (tx) => {
     const reservas = [];
-
+ 
     for (
       let indice = 0;
       indice <
@@ -630,15 +630,15 @@ export async function crearReservasMultiples({
     ) {
       const habitacion =
         disponibilidad.habitaciones[indice];
-
+ 
       const personasAsignadas =
         disponibilidad.distribucion[indice];
-
+ 
       const conflicto =
         await tx.reserva.findFirst({
           where: {
             habitacionId: habitacion.id,
-
+ 
             estado: {
               in: [
                 "PENDIENTE_PAGO",
@@ -646,64 +646,64 @@ export async function crearReservasMultiples({
                 "CHECK_IN",
               ],
             },
-
+ 
             fechaEntrada: {
               lt: salida,
             },
-
+ 
             fechaSalida: {
               gt: entrada,
             },
           },
-
+ 
           select: {
             id: true,
           },
         });
-
+ 
       if (conflicto) {
         throw new Error(
           "Una de las habitaciones dejó de estar disponible. Intenta nuevamente"
         );
       }
-
+ 
       const tarifa =
         await obtenerTarifaPorPersonas(
           personasAsignadas
         );
-
+ 
       const precioPorNoche = Number(
         tarifa.precio
       );
-
+ 
       const precioTotal =
         precioPorNoche * cantidadNoches;
-
+ 
       const codigo =
         await generarCodigoUnico(tx);
-
+ 
       const reserva =
         await tx.reserva.create({
           data: {
             codigo,
             clienteId: cliente.id,
             habitacionId: habitacion.id,
-
+ 
             fechaEntrada: entrada,
             fechaSalida: salida,
-
+ 
             cantidadPersonas:
               personasAsignadas,
-
+ 
             cantidadNoches,
             precioPorNoche,
             precioTotal,
-
+ 
             estado: "PENDIENTE_PAGO",
             expiraEn,
           },
         });
-
+ 
       const pago = await tx.pago.create({
         data: {
           reservaId: reserva.id,
@@ -712,18 +712,18 @@ export async function crearReservasMultiples({
           estado: metodo === "EFECTIVO" ? "PENDIENTE" : "NO_GENERADO",
         },
       });
-
+ 
       reservas.push({
         ...reserva,
         habitacion,
         pago,
       });
     }
-
+ 
     return reservas;
   });
 }
-
+ 
 export async function listarHabitacionesDisponiblesWalkIn({ fechaEntrada, fechaSalida, personas }) {
   const entrada = crearFecha(fechaEntrada);
   const salida = crearFecha(fechaSalida);
@@ -742,10 +742,10 @@ export async function listarHabitacionesDisponiblesWalkIn({ fechaEntrada, fechaS
   });
   return habitaciones.filter((habitacion) => !ocupadasIds.has(habitacion.id));
 }
-
+ 
 export async function listarReservasParaCheckIn() {
   const { fin } = obtenerRangoHoyHonduras();
-
+ 
   const reservas = await prisma.reserva.findMany({
     where: {
       estado: { in: ["CONFIRMADA", "PENDIENTE_PAGO"] },
@@ -760,24 +760,24 @@ export async function listarReservasParaCheckIn() {
     orderBy: { fechaEntrada: "asc" },
     include: { habitacion: true, cliente: true, pago: true },
   });
-
+ 
   return Array.from(
     new Map(reservas.map((reserva) => [reserva.habitacionId, reserva])).values()
   );
 }
-
+ 
 export async function listarReservasParaCheckout() {
   const reservas = await prisma.reserva.findMany({
     where: { estado: "CHECK_IN" },
     orderBy: { fechaEntrada: "asc" },
     include: { habitacion: true, cliente: true },
   });
-
+ 
   return Array.from(
     new Map(reservas.map((reserva) => [reserva.habitacionId, reserva])).values()
   );
 }
-
+ 
 export async function listarReservasParaCancelar() {
   return prisma.reserva.findMany({
     where: {
@@ -791,7 +791,7 @@ export async function listarReservasParaCancelar() {
     },
   });
 }
-
+ 
 export async function cancelarReservaPorId(reservaId) {
   const reserva = await prisma.reserva.findUnique({
     where: { id: reservaId },
@@ -801,15 +801,15 @@ export async function cancelarReservaPorId(reservaId) {
       pago: true,
     },
   });
-
+ 
   if (!reserva) {
     throw new Error("Reserva no encontrada.");
   }
-
+ 
   if (!["PENDIENTE_PAGO", "CONFIRMADA"].includes(reserva.estado)) {
     throw new Error(`La reserva está en estado ${reserva.estado} y no se puede cancelar desde este menú.`);
   }
-
+ 
   const reservaActualizada = await prisma.reserva.update({
     where: { id: reserva.id },
     data: {
@@ -822,23 +822,23 @@ export async function cancelarReservaPorId(reservaId) {
       pago: true,
     },
   });
-
+ 
   await registrarAuditoria({
     accion: "CANCELAR_RESERVA",
     entidad: "Reserva",
     entidadId: reservaActualizada.id,
     detalle: `${reservaActualizada.codigo} · Hab. ${reservaActualizada.habitacion.numero} · ${reservaActualizada.cliente.nombre}`,
   });
-
+ 
   return reservaActualizada;
 }
-
+ 
 // Para el modal de "Llegó" en la app: además de la habitación que ya tenía
 // reservada, muestra qué otras habitaciones de la misma capacidad están
 // libres AHORA, por si se quiere reasignar al momento de la entrada.
 export async function listarAlternativasParaCheckIn(habitacionId) {
   const { fin } = obtenerRangoHoyHonduras();
-
+ 
   const reserva = await prisma.reserva.findFirst({
     where: {
       habitacionId,
@@ -847,9 +847,9 @@ export async function listarAlternativasParaCheckIn(habitacionId) {
     },
     orderBy: { fechaEntrada: "asc" },
   });
-
+ 
   if (!reserva) throw new Error("No hay reserva confirmada para esa habitación.");
-
+ 
   const habitaciones = await prisma.habitacion.findMany({
     where: {
       activa: true,
@@ -858,7 +858,7 @@ export async function listarAlternativasParaCheckIn(habitacionId) {
     },
     orderBy: [{ capacidad: "asc" }, { numero: "asc" }],
   });
-
+ 
   const ocupadas = await prisma.reserva.findMany({
     where: {
       id: { not: reserva.id },
@@ -870,7 +870,7 @@ export async function listarAlternativasParaCheckIn(habitacionId) {
     select: { habitacionId: true },
   });
   const ocupadasIds = new Set(ocupadas.map((r) => r.habitacionId));
-
+ 
   return habitaciones
     .filter((h) => !ocupadasIds.has(h.id))
     .map((h) => ({
@@ -880,107 +880,119 @@ export async function listarAlternativasParaCheckIn(habitacionId) {
       esLaOriginal: h.id === habitacionId,
     }));
 }
-
+ 
+// FIX: antes esta función hacía "leer conflicto -> escribir" con llamadas
+// sueltas a prisma (sin transacción). Eso deja una ventana real donde dos
+// check-ins simultáneos que reasignan la MISMA habitación nueva pueden
+// pasar los dos la validación de conflicto (porque ninguno ha escrito
+// todavía) y terminar los dos ocupando la misma habitación → doble
+// reserva. Ahora todo el flujo (buscar reserva, validar la habitación
+// nueva, revisar conflicto, y actualizar) corre dentro de la misma
+// transacción Serializable que ya se usa para crear reservas, así que si
+// dos check-ins chocan, uno de los dos se reintenta o falla con un error
+// claro en vez de pisar al otro.
 export async function registrarCheckInPorHabitacion(
   habitacionId,
   metodoPago,
   nuevaHabitacionId
 ) {
   const { fin } = obtenerRangoHoyHonduras();
-
-  const reserva = await prisma.reserva.findFirst({
-    where: {
-      habitacionId,
-      estado: { in: ["CONFIRMADA", "PENDIENTE_PAGO"] },
-      fechaEntrada: { lt: fin },
-    },
-    orderBy: { fechaEntrada: "asc" },
-    include: { habitacion: true, cliente: true, pago: true },
-  });
-  if (!reserva) throw new Error("No hay reserva confirmada para esa habitación.");
-
-  const pendienteDePago = reserva.estado === "PENDIENTE_PAGO";
-
-  let metodo = null;
-  if (pendienteDePago) {
-    metodo = String(metodoPago ?? "").trim().toUpperCase();
-    if (!["EFECTIVO", "TRANSFERENCIA", "TARJETA"].includes(metodo)) {
-      throw new Error('Indica cómo pagó: "efectivo", "transferencia" o "tarjeta"');
-    }
-  }
-
-  let habitacionFinalId = reserva.habitacionId;
-
-  if (nuevaHabitacionId && nuevaHabitacionId !== reserva.habitacionId) {
-    const nuevaHabitacion = await prisma.habitacion.findFirst({
+ 
+  const reservaActualizada = await ejecutarTransaccionSerializable(async (tx) => {
+    const reserva = await tx.reserva.findFirst({
       where: {
-        id: nuevaHabitacionId,
-        activa: true,
-        estado: { not: "MANTENIMIENTO" },
-        capacidad: { gte: reserva.cantidadPersonas },
+        habitacionId,
+        estado: { in: ["CONFIRMADA", "PENDIENTE_PAGO"] },
+        fechaEntrada: { lt: fin },
       },
+      orderBy: { fechaEntrada: "asc" },
+      include: { habitacion: true, cliente: true, pago: true },
     });
-
-    if (!nuevaHabitacion) {
-      throw new Error("La habitación elegida no existe o no tiene capacidad suficiente.");
+    if (!reserva) throw new Error("No hay reserva confirmada para esa habitación.");
+ 
+    const pendienteDePago = reserva.estado === "PENDIENTE_PAGO";
+ 
+    let metodo = null;
+    if (pendienteDePago) {
+      metodo = String(metodoPago ?? "").trim().toUpperCase();
+      if (!["EFECTIVO", "TRANSFERENCIA", "TARJETA"].includes(metodo)) {
+        throw new Error('Indica cómo pagó: "efectivo", "transferencia" o "tarjeta"');
+      }
     }
-
-    const conflicto = await prisma.reserva.findFirst({
-      where: {
-        id: { not: reserva.id },
-        habitacionId: nuevaHabitacionId,
-        estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
-        fechaEntrada: { lt: reserva.fechaSalida },
-        fechaSalida: { gt: reserva.fechaEntrada },
-      },
-    });
-
-    if (conflicto) {
-      throw new Error("Esa habitación ya no está disponible para estas fechas.");
+ 
+    let habitacionFinalId = reserva.habitacionId;
+ 
+    if (nuevaHabitacionId && nuevaHabitacionId !== reserva.habitacionId) {
+      const nuevaHabitacion = await tx.habitacion.findFirst({
+        where: {
+          id: nuevaHabitacionId,
+          activa: true,
+          estado: { not: "MANTENIMIENTO" },
+          capacidad: { gte: reserva.cantidadPersonas },
+        },
+      });
+ 
+      if (!nuevaHabitacion) {
+        throw new Error("La habitación elegida no existe o no tiene capacidad suficiente.");
+      }
+ 
+      const conflicto = await tx.reserva.findFirst({
+        where: {
+          id: { not: reserva.id },
+          habitacionId: nuevaHabitacionId,
+          estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+          fechaEntrada: { lt: reserva.fechaSalida },
+          fechaSalida: { gt: reserva.fechaEntrada },
+        },
+      });
+ 
+      if (conflicto) {
+        throw new Error("Esa habitación ya no está disponible para estas fechas.");
+      }
+ 
+      habitacionFinalId = nuevaHabitacionId;
     }
-
-    habitacionFinalId = nuevaHabitacionId;
-  }
-
-  const reservaActualizada = await prisma.reserva.update({
-    where: { id: reserva.id },
-    data: {
-      habitacionId: habitacionFinalId,
-      estado: "CHECK_IN",
-      expiraEn: null,
-      ...(pendienteDePago
-        ? {
-            pago: {
-              upsert: {
-                create: {
-                  monto: reserva.precioTotal,
-                  proveedor: metodo,
-                  estado: "APROBADO",
-                  fechaPago: new Date(),
-                },
-                update: {
-                  estado: "APROBADO",
-                  proveedor: metodo,
-                  fechaPago: new Date(),
+ 
+    return tx.reserva.update({
+      where: { id: reserva.id },
+      data: {
+        habitacionId: habitacionFinalId,
+        estado: "CHECK_IN",
+        expiraEn: null,
+        ...(pendienteDePago
+          ? {
+              pago: {
+                upsert: {
+                  create: {
+                    monto: reserva.precioTotal,
+                    proveedor: metodo,
+                    estado: "APROBADO",
+                    fechaPago: new Date(),
+                  },
+                  update: {
+                    estado: "APROBADO",
+                    proveedor: metodo,
+                    fechaPago: new Date(),
+                  },
                 },
               },
-            },
-          }
-        : {}),
-    },
-    include: { habitacion: true, cliente: true },
+            }
+          : {}),
+      },
+      include: { habitacion: true, cliente: true },
+    });
   });
-
+ 
   await registrarAuditoria({
     accion: "CHECK_IN",
     entidad: "Reserva",
     entidadId: reservaActualizada.id,
     detalle: `${reservaActualizada.codigo} · Hab. ${reservaActualizada.habitacion.numero} · ${reservaActualizada.cliente.nombre}`,
   });
-
+ 
   return reservaActualizada;
 }
-
+ 
 export async function registrarCheckoutPorHabitacion(habitacionId) {
   const reserva = await prisma.reserva.findFirst({
     where: { habitacionId, estado: "CHECK_IN" },
@@ -988,34 +1000,34 @@ export async function registrarCheckoutPorHabitacion(habitacionId) {
     include: { habitacion: true, cliente: true },
   });
   if (!reserva) throw new Error("No hay habitación ocupada con ese registro.");
-
+ 
   const reservaActualizada = await prisma.reserva.update({
     where: { id: reserva.id },
     data: { estado: "CHECK_OUT" },
     include: { habitacion: true, cliente: true },
   });
-
+ 
   await registrarAuditoria({
     accion: "CHECKOUT",
     entidad: "Reserva",
     entidadId: reservaActualizada.id,
     detalle: `${reservaActualizada.codigo} · Hab. ${reservaActualizada.habitacion.numero} · ${reservaActualizada.cliente.nombre}`,
   });
-
+ 
   return reservaActualizada;
 }
-
+ 
 export async function obtenerReservaMasRecientePorTelefono(
   telefono
 ) {
   const telefonoLimpio = String(telefono ?? "")
     .replace(/\D/g, "")
     .trim();
-
+ 
   if (!telefonoLimpio) {
     throw new Error("El teléfono es obligatorio");
   }
-
+ 
   return prisma.reserva.findFirst({
     where: {
       cliente: {
@@ -1032,7 +1044,7 @@ export async function obtenerReservaMasRecientePorTelefono(
     },
   });
 }
-
+ 
 export async function obtenerReservaPorCodigo(
   codigo
 ) {
@@ -1041,44 +1053,44 @@ export async function obtenerReservaPorCodigo(
   )
     .trim()
     .toUpperCase();
-
+ 
   if (!codigoLimpio) {
     throw new Error(
       "El código de reserva es obligatorio"
     );
   }
-
+ 
   const reserva =
     await prisma.reserva.findUnique({
       where: {
         codigo: codigoLimpio,
       },
-
+ 
       include: {
         cliente: true,
         habitacion: true,
         pago: true,
       },
     });
-
+ 
   if (!reserva) {
     throw new Error(
       "Reserva no encontrada"
     );
   }
-
+ 
   return reserva;
 }
-
+ 
 export async function liberarReservaPorCodigo(codigo) {
   const codigoLimpio = String(codigo ?? "")
     .trim()
     .toUpperCase();
-
+ 
   if (!codigoLimpio) {
     throw new Error("El código de reserva es obligatorio");
   }
-
+ 
   const reserva = await prisma.reserva.findUnique({
     where: {
       codigo: codigoLimpio,
@@ -1088,17 +1100,17 @@ export async function liberarReservaPorCodigo(codigo) {
       habitacion: true,
     },
   });
-
+ 
   if (!reserva) {
     throw new Error("Reserva no encontrada");
   }
-
+ 
   if (!["CONFIRMADA", "CHECK_IN"].includes(reserva.estado)) {
     throw new Error(
       `Esta reserva está en estado ${reserva.estado} y no se puede liberar`
     );
   }
-
+ 
   const reservaActualizada = await prisma.reserva.update({
     where: {
       id: reserva.id,
@@ -1111,17 +1123,17 @@ export async function liberarReservaPorCodigo(codigo) {
       habitacion: true,
     },
   });
-
+ 
   await registrarAuditoria({
     accion: "LIBERAR_MANUAL",
     entidad: "Reserva",
     entidadId: reservaActualizada.id,
     detalle: `${reservaActualizada.codigo} · Hab. ${reservaActualizada.habitacion.numero} · ${reservaActualizada.cliente.nombre}`,
   });
-
+ 
   return reservaActualizada;
 }
-
+ 
 export async function listarHabitacionesParaMantenimiento() {
   return prisma.habitacion.findMany({
     where: {
@@ -1132,18 +1144,18 @@ export async function listarHabitacionesParaMantenimiento() {
     },
   });
 }
-
+ 
 export async function alternarMantenimientoHabitacion(habitacionId) {
   const habitacion = await prisma.habitacion.findUnique({
     where: {
       id: habitacionId,
     },
   });
-
+ 
   if (!habitacion) {
     throw new Error("Habitación no encontrada");
   }
-
+ 
   if (habitacion.estado === "DISPONIBLE") {
     const ocupada = await prisma.reserva.findFirst({
       where: {
@@ -1156,17 +1168,17 @@ export async function alternarMantenimientoHabitacion(habitacionId) {
         },
       },
     });
-
+ 
     if (ocupada) {
       throw new Error(
         `La habitación ${habitacion.numero} tiene una reserva activa (${ocupada.codigo}) y no se puede poner en mantenimiento`
       );
     }
   }
-
+ 
   const nuevoEstado =
     habitacion.estado === "MANTENIMIENTO" ? "DISPONIBLE" : "MANTENIMIENTO";
-
+ 
   const habitacionActualizada = await prisma.habitacion.update({
     where: {
       id: habitacion.id,
@@ -1175,7 +1187,7 @@ export async function alternarMantenimientoHabitacion(habitacionId) {
       estado: nuevoEstado,
     },
   });
-
+ 
   await registrarAuditoria({
     accion:
       nuevoEstado === "MANTENIMIENTO"
@@ -1185,10 +1197,10 @@ export async function alternarMantenimientoHabitacion(habitacionId) {
     entidadId: habitacionActualizada.id,
     detalle: `Habitación ${habitacionActualizada.numero}`,
   });
-
+ 
   return habitacionActualizada;
 }
-
+ 
 export async function listarReservasQueRequierenAprobacion() {
   return prisma.reserva.findMany({
     where: {
@@ -1203,45 +1215,45 @@ export async function listarReservasQueRequierenAprobacion() {
     },
   });
 }
-
+ 
 export async function aprobarHabitacionMasGrande(reservaId) {
   const reserva = await prisma.reserva.findUnique({
     where: { id: reservaId },
     include: { habitacion: true, cliente: true },
   });
-
+ 
   if (!reserva) throw new Error("Reserva no encontrada.");
   if (!reserva.requiereAprobacion) {
     throw new Error("Esta reserva no tiene ninguna aprobación pendiente.");
   }
-
+ 
   const actualizada = await prisma.reserva.update({
     where: { id: reservaId },
     data: { requiereAprobacion: false },
     include: { habitacion: true, cliente: true },
   });
-
+ 
   await registrarAuditoria({
     accion: "APROBAR_HABITACION_MAS_GRANDE",
     entidad: "Reserva",
     entidadId: reserva.id,
     detalle: `${reserva.codigo} · Hab. ${reserva.habitacion.numero}`,
   });
-
+ 
   return actualizada;
 }
-
+ 
 export async function rechazarHabitacionMasGrande(reservaId) {
   const reserva = await prisma.reserva.findUnique({
     where: { id: reservaId },
     include: { habitacion: true, cliente: true, pago: true },
   });
-
+ 
   if (!reserva) throw new Error("Reserva no encontrada.");
   if (!reserva.requiereAprobacion) {
     throw new Error("Esta reserva no tiene ninguna aprobación pendiente.");
   }
-
+ 
   const actualizada = await prisma.reserva.update({
     where: { id: reservaId },
     data: {
@@ -1251,83 +1263,93 @@ export async function rechazarHabitacionMasGrande(reservaId) {
     },
     include: { habitacion: true, cliente: true },
   });
-
+ 
   await registrarAuditoria({
     accion: "RECHAZAR_HABITACION_MAS_GRANDE",
     entidad: "Reserva",
     entidadId: reserva.id,
     detalle: `${reserva.codigo} · Hab. ${reserva.habitacion.numero}`,
   });
-
+ 
   return actualizada;
 }
-
+ 
 // Mueve una reserva activa (pendiente, confirmada, o ya con check-in) a
 // otra habitación — para corregir errores ("me equivoqué y la puse en la
 // 1, muévela a la 2") sin tener que tocar la base de datos a mano.
+//
+// FIX: igual que en registrarCheckInPorHabitacion, antes el chequeo de
+// conflicto y el update vivían como dos llamadas sueltas a prisma, sin
+// transacción — dos "mover" concurrentes hacia la misma habitación nueva
+// podían pasar ambos la validación y terminar duplicando la ocupación.
+// Ahora todo corre dentro de ejecutarTransaccionSerializable.
 export async function moverReservaDeHabitacion(reservaId, nuevaHabitacionId) {
-  const reserva = await prisma.reserva.findUnique({
-    where: { id: reservaId },
-    include: { habitacion: true, cliente: true },
+  const { actualizada, habitacionAnteriorNumero } = await ejecutarTransaccionSerializable(async (tx) => {
+    const reserva = await tx.reserva.findUnique({
+      where: { id: reservaId },
+      include: { habitacion: true, cliente: true },
+    });
+ 
+    if (!reserva) {
+      throw new Error("Reserva no encontrada");
+    }
+ 
+    if (!["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"].includes(reserva.estado)) {
+      throw new Error("Solo se pueden mover reservas activas (pendientes, confirmadas, o con check-in).");
+    }
+ 
+    if (reserva.habitacionId === nuevaHabitacionId) {
+      throw new Error("Esa reserva ya está en esa habitación.");
+    }
+ 
+    const nuevaHabitacion = await tx.habitacion.findFirst({
+      where: { id: nuevaHabitacionId, activa: true, estado: "DISPONIBLE" },
+    });
+ 
+    if (!nuevaHabitacion) {
+      throw new Error("La habitación de destino no existe o está en mantenimiento.");
+    }
+ 
+    const capacidadNecesaria = reserva.cantidadPersonas === 4 ? 3 : reserva.cantidadPersonas;
+    if (nuevaHabitacion.capacidad < capacidadNecesaria) {
+      throw new Error(
+        `La habitación ${nuevaHabitacion.numero} no tiene capacidad suficiente para ${reserva.cantidadPersonas} persona(s).`
+      );
+    }
+ 
+    const conflicto = await tx.reserva.findFirst({
+      where: {
+        id: { not: reservaId },
+        habitacionId: nuevaHabitacionId,
+        estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+        fechaEntrada: { lt: reserva.fechaSalida },
+        fechaSalida: { gt: reserva.fechaEntrada },
+      },
+    });
+ 
+    if (conflicto) {
+      throw new Error(`La habitación ${nuevaHabitacion.numero} ya está ocupada o reservada para esas fechas.`);
+    }
+ 
+    const actualizada = await tx.reserva.update({
+      where: { id: reservaId },
+      data: { habitacionId: nuevaHabitacionId },
+      include: { habitacion: true, cliente: true },
+    });
+ 
+    return { actualizada, habitacionAnteriorNumero: reserva.habitacion.numero };
   });
-
-  if (!reserva) {
-    throw new Error("Reserva no encontrada");
-  }
-
-  if (!["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"].includes(reserva.estado)) {
-    throw new Error("Solo se pueden mover reservas activas (pendientes, confirmadas, o con check-in).");
-  }
-
-  if (reserva.habitacionId === nuevaHabitacionId) {
-    throw new Error("Esa reserva ya está en esa habitación.");
-  }
-
-  const nuevaHabitacion = await prisma.habitacion.findFirst({
-    where: { id: nuevaHabitacionId, activa: true, estado: "DISPONIBLE" },
-  });
-
-  if (!nuevaHabitacion) {
-    throw new Error("La habitación de destino no existe o está en mantenimiento.");
-  }
-
-  const capacidadNecesaria = reserva.cantidadPersonas === 4 ? 3 : reserva.cantidadPersonas;
-  if (nuevaHabitacion.capacidad < capacidadNecesaria) {
-    throw new Error(
-      `La habitación ${nuevaHabitacion.numero} no tiene capacidad suficiente para ${reserva.cantidadPersonas} persona(s).`
-    );
-  }
-
-  const conflicto = await prisma.reserva.findFirst({
-    where: {
-      id: { not: reservaId },
-      habitacionId: nuevaHabitacionId,
-      estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
-      fechaEntrada: { lt: reserva.fechaSalida },
-      fechaSalida: { gt: reserva.fechaEntrada },
-    },
-  });
-
-  if (conflicto) {
-    throw new Error(`La habitación ${nuevaHabitacion.numero} ya está ocupada o reservada para esas fechas.`);
-  }
-
-  const actualizada = await prisma.reserva.update({
-    where: { id: reservaId },
-    data: { habitacionId: nuevaHabitacionId },
-    include: { habitacion: true, cliente: true },
-  });
-
+ 
   await registrarAuditoria({
     accion: "MOVER_HABITACION",
     entidad: "Reserva",
-    entidadId: reserva.id,
-    detalle: `${reserva.codigo} · Hab. ${reserva.habitacion.numero} → Hab. ${nuevaHabitacion.numero} · ${reserva.cliente.nombre}`,
+    entidadId: actualizada.id,
+    detalle: `${actualizada.codigo} · Hab. ${habitacionAnteriorNumero} → Hab. ${actualizada.habitacion.numero} · ${actualizada.cliente.nombre}`,
   });
-
+ 
   return actualizada;
 }
-
+ 
 // Lista las reservas activas (para elegir cuál mover), con su
 // habitación actual — igual que "Salida", sin importar la fecha.
 export async function listarReservasActivasParaMover() {
@@ -1338,7 +1360,7 @@ export async function listarReservasActivasParaMover() {
     orderBy: { fechaEntrada: "asc" },
     include: { habitacion: true, cliente: true },
   });
-
+ 
   return reservas.map((reserva) => ({
     id: reserva.id,
     codigo: reserva.codigo,
@@ -1350,16 +1372,16 @@ export async function listarReservasActivasParaMover() {
     fechaSalida: reserva.fechaSalida,
   }));
 }
-
+ 
 // Para el modal de "mover": habitaciones libres para las MISMAS fechas
 // que ya tiene la reserva (sin contar la habitación actual).
 export async function listarHabitacionesLibresParaMover(reservaId) {
   const reserva = await prisma.reserva.findUnique({ where: { id: reservaId } });
-
+ 
   if (!reserva) {
     throw new Error("Reserva no encontrada");
   }
-
+ 
   const habitaciones = await prisma.habitacion.findMany({
     where: {
       activa: true,
@@ -1376,6 +1398,6 @@ export async function listarHabitacionesLibresParaMover(reservaId) {
     },
     orderBy: { numero: "asc" },
   });
-
+ 
   return habitaciones;
 }
