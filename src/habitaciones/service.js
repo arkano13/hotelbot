@@ -1,6 +1,56 @@
 import { prisma } from "../lib/prisma.js";
 import { obtenerRangoHoyHonduras, crearFechaHonduras } from "../lib/fecha.js";
 import { hotelInfo } from "../config/hotelInfo.js";
+import { registrarAuditoria } from "../auditoria/service.js";
+
+// Edita el número y la capacidad de una habitación ya creada (desde la
+// pantalla de "Editar habitación" en la app). No toca el estado de
+// mantenimiento ni la disponibilidad — eso sigue siendo aparte.
+export async function editarHabitacion(habitacionId, { numero, capacidad }) {
+  const habitacion = await prisma.habitacion.findUnique({
+    where: { id: habitacionId },
+  });
+
+  if (!habitacion) {
+    throw new Error("Habitación no encontrada");
+  }
+
+  const numeroLimpio = String(numero ?? "").trim();
+  const capacidadNumero = Number(capacidad);
+
+  if (!numeroLimpio) {
+    throw new Error("El número de habitación es obligatorio");
+  }
+
+  if (!Number.isInteger(capacidadNumero) || capacidadNumero < 1) {
+    throw new Error("La capacidad no es válida");
+  }
+
+  let habitacionActualizada;
+  try {
+    habitacionActualizada = await prisma.habitacion.update({
+      where: { id: habitacionId },
+      data: {
+        numero: numeroLimpio,
+        capacidad: capacidadNumero,
+      },
+    });
+  } catch (error) {
+    if (error.code === "P2002") {
+      throw new Error(`Ya existe una habitación con el número "${numeroLimpio}"`);
+    }
+    throw error;
+  }
+
+  await registrarAuditoria({
+    accion: "EDITAR_HABITACION",
+    entidad: "Habitacion",
+    entidadId: habitacionActualizada.id,
+    detalle: `Hab. ${habitacion.numero} → número "${numeroLimpio}", capacidad ${capacidadNumero}`,
+  });
+
+  return habitacionActualizada;
+}
 
 export async function listarHabitacionesConEstado() {
   const { fin } = obtenerRangoHoyHonduras();
@@ -87,6 +137,7 @@ export async function listarHabitacionesConEstado() {
         id: reserva.id,
         codigo: reserva.codigo,
         estado: reserva.estado,
+        tipoEstadia: reserva.tipoEstadia,
         cliente: reserva.cliente?.nombre ?? null,
         telefono: reserva.cliente?.telefono ?? null,
         fechaEntrada: reserva.fechaEntrada,

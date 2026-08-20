@@ -1,6 +1,7 @@
 import {
   listarHabitacionesConEstado,
   listarHabitacionesPorCapacidadConEstado,
+  editarHabitacion,
 } from "../habitaciones/service.js";
 
 import {
@@ -58,6 +59,18 @@ function manejarError(res, error) {
 export async function habitaciones(req, res) {
   try {
     const datos = await listarHabitacionesConEstado();
+    return res.json({ success: true, data: datos });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function editarHabitacionHandler(req, res) {
+  try {
+    const datos = await editarHabitacion(req.params.habitacionId, {
+      numero: req.body?.numero,
+      capacidad: req.body?.capacidad,
+    });
     return res.json({ success: true, data: datos });
   } catch (error) {
     return manejarError(res, error);

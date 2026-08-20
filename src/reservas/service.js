@@ -12,8 +12,8 @@ import {
 import { obtenerTarifaPorPersonas } from "../tarifas/service.js";
 import { enviarNotificacionATodos } from "../notificaciones/service.js";
  
-const MINUTOS_EXPIRACION = 30;
-const MINUTOS_EXPIRACION_EFECTIVO = 24 * 60;
+// Las reservas pendientes de pago ya no vencen (decisión del hotel) —
+// se quitaron las constantes de tiempo de expiración que se usaban antes.
  
 async function ejecutarTransaccionSerializable(operacion, intentosMaximos = 3) {
   for (let intento = 1; intento <= intentosMaximos; intento++) {
@@ -240,11 +240,10 @@ export async function crearReservaTemporal({
       documento: documentoLimpio,
     });
  
-  const expiraEn = new Date(
-    Date.now() +
-      (metodo === "EFECTIVO" ? MINUTOS_EXPIRACION_EFECTIVO : MINUTOS_EXPIRACION) * 60 * 1000
-  );
- 
+  // Ya no vencen las reservas pendientes de pago (decisión del hotel) —
+  // se deja de calcular expiraEn, siempre queda en null.
+  const expiraEn = null;
+
   return ejecutarTransaccionSerializable(async (tx) => {
     const conflicto = await tx.reserva.findFirst({
       where: {
@@ -354,6 +353,7 @@ export async function crearReservaWalkIn({
   tipoEstadia,
   modo,
   yaPago,
+  precioPorNoche: precioPorNocheIngresado,
 }) {
   // "OCUPAR" (por defecto): el huésped ya está físicamente ahí, la
   // habitación queda ocupada de inmediato (CHECK_IN), y siempre se cobra
@@ -379,9 +379,14 @@ export async function crearReservaWalkIn({
     throw new Error('Una estadía de 3 horas no se puede "solo reservar" — siempre ocupa de inmediato.');
   }
  
-  const HORAS_PARA_LLEGAR = 24;
-  const PRECIO_3_HORAS = 350;
   const DURACION_3_HORAS_MS = 3 * 60 * 60 * 1000;
+
+  // El precio ya no sale de la tabla de tarifas ni de un valor fijo — lo
+  // escribe quien está creando la reserva desde la app (walk-in), a mano.
+  const precioPorNocheManual = Number(precioPorNocheIngresado);
+  if (!Number.isFinite(precioPorNocheManual) || precioPorNocheManual <= 0) {
+    throw new Error("El precio es obligatorio y debe ser mayor a 0");
+  }
  
   let nombreLimpio, telefonoLimpio, documentoLimpio, cantidadPersonas, entrada, salida;
  
@@ -462,12 +467,11 @@ export async function crearReservaWalkIn({
  
   if (esPorHoras) {
     cantidadNoches = 0;
-    precioPorNoche = PRECIO_3_HORAS;
-    precioTotal = PRECIO_3_HORAS;
+    precioPorNoche = precioPorNocheManual;
+    precioTotal = precioPorNocheManual;
   } else {
-    const tarifa = await obtenerTarifaPorPersonas(cantidadPersonas);
     cantidadNoches = calcularNoches(entrada, salida);
-    precioPorNoche = Number(tarifa.precio);
+    precioPorNoche = precioPorNocheManual;
     precioTotal = precioPorNoche * cantidadNoches;
   }
  
@@ -504,13 +508,8 @@ export async function crearReservaWalkIn({
         precioPorNoche,
         precioTotal,
         estado: !soloReservar ? "CHECK_IN" : (reservaYaPagada ? "CONFIRMADA" : "PENDIENTE_PAGO"),
-        // Si es "solo reservar" y todavía no pagó, tiene 24 horas para
-        // llegar (igual que las reservas de WhatsApp en efectivo). Si ya
-        // pagó, o si ya está ocupando, no vence nunca.
-        expiraEn:
-          soloReservar && !reservaYaPagada
-            ? new Date(Date.now() + HORAS_PARA_LLEGAR * 60 * 60 * 1000)
-            : null,
+        // Ya no vencen las reservas pendientes de pago (decisión del hotel).
+        expiraEn: null,
         observaciones: esPorHoras
           ? `Walk-in 3 horas, pago en ${metodo.toLowerCase()}`
           : !soloReservar
@@ -610,15 +609,9 @@ export async function crearReservasMultiples({
       documento: documentoLimpio,
     });
  
-  const expiraEn = new Date(
-    Date.now() +
-      (metodo === "EFECTIVO"
-        ? MINUTOS_EXPIRACION_EFECTIVO
-        : MINUTOS_EXPIRACION) *
-        60 *
-        1000
-  );
- 
+  // Ya no vencen las reservas pendientes de pago (decisión del hotel).
+  const expiraEn = null;
+
   return ejecutarTransaccionSerializable(async (tx) => {
     const reservas = [];
  

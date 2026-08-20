@@ -1,40 +1,41 @@
-import { prisma } from "../lib/prisma.js";
 
+import { prisma } from "../lib/prisma.js";
+ 
 const ZONA_HORARIA = "America/Tegucigalpa";
 const MILISEGUNDOS_DIA = 24 * 60 * 60 * 1000;
-
+ 
 const FILTRO_PAGO_COBRADO = {
   estado: "APROBADO",
   proveedor: { in: ["EFECTIVO", "TRANSFERENCIA", "TARJETA"] },
 };
-
+ 
 function validarFechaISO(fechaISO) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fechaISO ?? ""))) {
     throw new Error("La fecha debe tener formato YYYY-MM-DD");
   }
 }
-
+ 
 function rangoDelDiaHonduras(fechaISO) {
   validarFechaISO(fechaISO);
-
+ 
   // Honduras usa UTC-6 durante todo el año.
   const inicio = new Date(`${fechaISO}T06:00:00.000Z`);
   const fin = new Date(inicio.getTime() + MILISEGUNDOS_DIA);
-
+ 
   return { inicio, fin };
 }
-
+ 
 function rangoDelMesHonduras(anio, mes) {
   if (!Number.isInteger(anio) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
     throw new Error("El año o mes del reporte no es válido");
   }
-
+ 
   const inicio = new Date(Date.UTC(anio, mes - 1, 1, 6));
   const fin = new Date(Date.UTC(anio, mes, 1, 6));
-
+ 
   return { inicio, fin };
 }
-
+ 
 function fechaISOHonduras(fecha) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: ZONA_HORARIA,
@@ -43,17 +44,17 @@ function fechaISOHonduras(fecha) {
     day: "2-digit",
   }).format(new Date(fecha));
 }
-
+ 
 function metodoDePago(pago) {
   const proveedor = String(pago.proveedor ?? "").trim().toUpperCase();
-
+ 
   if (["EFECTIVO", "TRANSFERENCIA", "TARJETA"].includes(proveedor)) {
     return proveedor;
   }
-
+ 
   return "OTRO";
 }
-
+ 
 function convertirPago(pago) {
   return {
     id: pago.id,
@@ -76,7 +77,7 @@ function convertirPago(pago) {
     canceladaSinReembolso: pago.reserva.estado === "CANCELADA",
   };
 }
-
+ 
 function resumirPagos(pagos) {
   const detalles = pagos.map(convertirPago);
   const transferencias = detalles.filter(
@@ -84,16 +85,16 @@ function resumirPagos(pagos) {
   );
   const tarjetas = detalles.filter((pago) => pago.metodo === "TARJETA");
   const efectivos = detalles.filter((pago) => pago.metodo === "EFECTIVO");
-
+ 
   const sumarMonto = (lista) =>
     lista.reduce((total, pago) => total + pago.monto, 0);
-
+ 
   const ingresosTransferencia = sumarMonto(transferencias);
   const ingresosTarjeta = sumarMonto(tarjetas);
   const ingresosEfectivo = sumarMonto(efectivos);
   const ingresosTotal =
     ingresosTransferencia + ingresosTarjeta + ingresosEfectivo;
-
+ 
   return {
     pagos: detalles,
     transferencias,
@@ -116,7 +117,7 @@ function resumirPagos(pagos) {
     ),
   };
 }
-
+ 
 async function consultarPagosCobrados(inicio, fin) {
   return prisma.pago.findMany({
     where: {
@@ -134,21 +135,21 @@ async function consultarPagosCobrados(inicio, fin) {
     orderBy: { fechaPago: "asc" },
   });
 }
-
+ 
 export async function obtenerResumenDiario(fechaISO) {
   const { inicio, fin } = rangoDelDiaHonduras(fechaISO);
   const pagos = await consultarPagosCobrados(inicio, fin);
-
+ 
   return {
     tipo: "DIARIO",
     fecha: fechaISO,
     ...resumirPagos(pagos),
   };
 }
-
+ 
 function agruparPorDia(pagos) {
   const grupos = new Map();
-
+ 
   for (const pago of pagos) {
     const fecha = fechaISOHonduras(pago.fechaPago);
     const actual = grupos.get(fecha) ?? {
@@ -160,11 +161,11 @@ function agruparPorDia(pagos) {
       huespedes: 0,
       total: 0,
     };
-
+ 
     actual.cantidadPagos += 1;
     actual.huespedes += pago.personas;
     actual.total += pago.monto;
-
+ 
     if (pago.metodo === "EFECTIVO") {
       actual.efectivos += pago.monto;
     } else if (pago.metodo === "TARJETA") {
@@ -172,16 +173,16 @@ function agruparPorDia(pagos) {
     } else {
       actual.transferencias += pago.monto;
     }
-
+ 
     grupos.set(fecha, actual);
   }
-
+ 
   return [...grupos.values()].sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
-
+ 
 function agruparPorHabitacion(pagos) {
   const grupos = new Map();
-
+ 
   for (const pago of pagos) {
     const actual = grupos.get(pago.habitacion) ?? {
       habitacion: pago.habitacion,
@@ -190,35 +191,43 @@ function agruparPorHabitacion(pagos) {
       nochesVendidas: 0,
       ingresos: 0,
     };
-
+ 
     actual.pagos += 1;
     actual.huespedes += pago.personas;
     actual.nochesVendidas += pago.noches;
     actual.ingresos += pago.monto;
     grupos.set(pago.habitacion, actual);
   }
-
+ 
   return [...grupos.values()].sort(
     (a, b) => b.ingresos - a.ingresos || String(a.habitacion).localeCompare(String(b.habitacion)),
   );
 }
-
+ 
 function calcularNochesOcupadas(reserva, inicioMes, finMes) {
   const entrada = Math.max(reserva.fechaEntrada.getTime(), inicioMes.getTime());
   const salida = Math.min(reserva.fechaSalida.getTime(), finMes.getTime());
-
+ 
   if (salida <= entrada) {
     return 0;
   }
-
+ 
   return Math.round((salida - entrada) / MILISEGUNDOS_DIA);
 }
-
+ 
 export async function obtenerResumenMensual(anio, mes) {
   const rangoPagos = rangoDelMesHonduras(anio, mes);
-  const inicioEstadia = new Date(Date.UTC(anio, mes - 1, 1));
-  const finEstadia = new Date(Date.UTC(anio, mes, 1));
-
+  // FIX: antes esto usaba Date.UTC(anio, mes-1, 1) sin la hora 6, o sea
+  // medianoche UTC en vez de medianoche Honduras (UTC-6) — quedaba 6
+  // horas adelantado del límite real del mes. Eso metía en el reporte de
+  // "este mes" las últimas 6 horas (hora Honduras) del mes anterior, y
+  // dejaba fuera las últimas 6 horas del mes actual, afectando noches
+  // ocupadas y % de ocupación. Se reutiliza el mismo rango que ya usan
+  // los pagos (rangoDelMesHonduras), que sí calcula bien la medianoche
+  // Honduras.
+  const inicioEstadia = rangoPagos.inicio;
+  const finEstadia = rangoPagos.fin;
+ 
   const [pagosDb, reservasOcupadas, habitacionesActivas] = await Promise.all([
     consultarPagosCobrados(rangoPagos.inicio, rangoPagos.fin),
     prisma.reserva.findMany({
@@ -235,7 +244,7 @@ export async function obtenerResumenMensual(anio, mes) {
     }),
     prisma.habitacion.count({ where: { activa: true } }),
   ]);
-
+ 
   const resumen = resumirPagos(pagosDb);
   const pagosPorDia = agruparPorDia(resumen.pagos);
   const rendimientoHabitaciones = agruparPorHabitacion(resumen.pagos);
@@ -253,7 +262,7 @@ export async function obtenerResumenMensual(anio, mes) {
     (mejor, dia) => (!mejor || dia.total > mejor.total ? dia : mejor),
     null,
   );
-
+ 
   return {
     tipo: "MENSUAL",
     anio,
