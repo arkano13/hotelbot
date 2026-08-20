@@ -162,7 +162,12 @@ export async function listarHabitacionesPorCapacidadConEstado({
 }) {
   const entrada = crearFechaHonduras(fechaEntrada);
   const salida = crearFechaHonduras(fechaSalida);
-  const cantidadPersonas = Number(personas);
+
+  // "personas" ahora es opcional: como el precio ya no depende de cuántas
+  // camas pidió el cliente, ya no se filtra por capacidad — se muestran
+  // todas las habitaciones activas y el que ocupa elige la que quiera.
+  const hayFiltroPersonas = personas !== undefined && personas !== null && personas !== "";
+  const cantidadPersonas = hayFiltroPersonas ? Number(personas) : null;
 
   if (Number.isNaN(entrada.getTime()) || Number.isNaN(salida.getTime())) {
     throw new Error("Las fechas no son válidas");
@@ -176,7 +181,7 @@ export async function listarHabitacionesPorCapacidadConEstado({
     where: {
       activa: true,
       estado: { not: "MANTENIMIENTO" },
-      capacidad: { gte: cantidadPersonas },
+      ...(hayFiltroPersonas ? { capacidad: { gte: cantidadPersonas } } : {}),
     },
     orderBy: [{ capacidad: "asc" }, { numero: "asc" }],
   });
