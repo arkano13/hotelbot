@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   habitaciones,
   editarHabitacionHandler,
+  editarReservaHandler,
   reservasParaCheckIn,
   reservasParaCheckout,
   reservasParaCancelar,
@@ -43,6 +44,7 @@ const router = Router();
 // Dashboard
 router.get("/habitaciones", habitaciones);
 router.post("/habitaciones/:habitacionId/editar", editarHabitacionHandler);
+router.post("/reservas/:reservaId/editar", editarReservaHandler);
 
 // Check-in / checkout / cancelar
 router.get("/reservas/checkin", reservasParaCheckIn);

@@ -142,6 +142,8 @@ export async function listarHabitacionesConEstado() {
         telefono: reserva.cliente?.telefono ?? null,
         fechaEntrada: reserva.fechaEntrada,
         fechaSalida: reserva.fechaSalida,
+        cantidadNoches: reserva.cantidadNoches,
+        precioPorNoche: reserva.precioPorNoche,
         metodoPago: reserva.pago?.proveedor ?? null,
         estadoPago: reserva.pago?.estado ?? null,
       },

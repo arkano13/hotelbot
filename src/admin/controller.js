@@ -22,6 +22,7 @@ import {
   moverReservaDeHabitacion,
   listarReservasActivasParaMover,
   listarHabitacionesLibresParaMover,
+  editarReserva,
 } from "../reservas/service.js";
 
 import { obtenerWhatsAppSocket, reiniciarSesionWhatsApp } from "../whatsapp/client.js";
@@ -70,6 +71,20 @@ export async function editarHabitacionHandler(req, res) {
     const datos = await editarHabitacion(req.params.habitacionId, {
       numero: req.body?.numero,
       capacidad: req.body?.capacidad,
+    });
+    return res.json({ success: true, data: datos });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function editarReservaHandler(req, res) {
+  try {
+    const datos = await editarReserva(req.params.reservaId, {
+      nombreCliente: req.body?.nombreCliente,
+      cantidadNoches: req.body?.cantidadNoches,
+      horas: req.body?.horas,
+      precioPorNoche: req.body?.precioPorNoche,
     });
     return res.json({ success: true, data: datos });
   } catch (error) {

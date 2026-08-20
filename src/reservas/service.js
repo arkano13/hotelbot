@@ -825,7 +825,114 @@ export async function cancelarReservaPorId(reservaId) {
  
   return reservaActualizada;
 }
- 
+
+// Para "Editar habitación" en la app: cuando hay una reserva activa ahí,
+// permite corregir el nombre del cliente, la cantidad de noches (o las
+// horas, si es una reserva de "3 horas") y el precio, sin tener que
+// cancelar y volver a crear la reserva.
+export async function editarReserva(
+  reservaId,
+  { nombreCliente, cantidadNoches, horas, precioPorNoche: precioIngresado }
+) {
+  const reserva = await prisma.reserva.findUnique({
+    where: { id: reservaId },
+  });
+
+  if (!reserva) {
+    throw new Error("Reserva no encontrada.");
+  }
+
+  if (!["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"].includes(reserva.estado)) {
+    throw new Error(`La reserva está en estado ${reserva.estado} y ya no se puede editar.`);
+  }
+
+  const nombreLimpio =
+    nombreCliente !== undefined && nombreCliente !== null
+      ? String(nombreCliente).trim()
+      : null;
+  if (nombreCliente !== undefined && !nombreLimpio) {
+    throw new Error("El nombre del cliente es obligatorio.");
+  }
+
+  const hayPrecio =
+    precioIngresado !== undefined && precioIngresado !== null && precioIngresado !== "";
+  const precioNumero = hayPrecio ? Number(precioIngresado) : null;
+  if (hayPrecio && (!Number.isFinite(precioNumero) || precioNumero <= 0)) {
+    throw new Error("El precio no es válido.");
+  }
+
+  const esPorHoras = reserva.tipoEstadia === "3_HORAS";
+  const datosReserva = {};
+
+  if (esPorHoras) {
+    const hayHoras = horas !== undefined && horas !== null && horas !== "";
+    if (hayHoras) {
+      const horasNumero = Number(horas);
+      if (!Number.isFinite(horasNumero) || horasNumero <= 0) {
+        throw new Error("Las horas no son válidas.");
+      }
+      datosReserva.fechaSalida = new Date(
+        reserva.fechaEntrada.getTime() + horasNumero * 60 * 60 * 1000
+      );
+    }
+    if (precioNumero !== null) {
+      datosReserva.precioPorNoche = precioNumero;
+      datosReserva.precioTotal = precioNumero;
+    }
+  } else {
+    const hayNoches =
+      cantidadNoches !== undefined && cantidadNoches !== null && cantidadNoches !== "";
+    let nochesFinal = reserva.cantidadNoches;
+    if (hayNoches) {
+      nochesFinal = Number(cantidadNoches);
+      if (!Number.isInteger(nochesFinal) || nochesFinal < 1) {
+        throw new Error("La cantidad de noches no es válida.");
+      }
+      datosReserva.cantidadNoches = nochesFinal;
+      datosReserva.fechaSalida = new Date(
+        reserva.fechaEntrada.getTime() + nochesFinal * 24 * 60 * 60 * 1000
+      );
+    }
+    if (precioNumero !== null) {
+      datosReserva.precioPorNoche = precioNumero;
+    }
+    if (hayNoches || precioNumero !== null) {
+      const precioBase =
+        precioNumero !== null ? precioNumero : Number(reserva.precioPorNoche);
+      datosReserva.precioTotal = precioBase * nochesFinal;
+    }
+  }
+
+  if (!nombreLimpio && Object.keys(datosReserva).length === 0) {
+    throw new Error("No hay cambios para guardar.");
+  }
+
+  const resultado = await prisma.$transaction(async (tx) => {
+    if (nombreLimpio) {
+      await tx.cliente.update({
+        where: { id: reserva.clienteId },
+        data: { nombre: nombreLimpio },
+      });
+    }
+    if (Object.keys(datosReserva).length > 0) {
+      await tx.reserva.update({ where: { id: reservaId }, data: datosReserva });
+    }
+    return tx.reserva.findUnique({
+      where: { id: reservaId },
+      include: { cliente: true, habitacion: true },
+    });
+  });
+
+  await registrarAuditoria({
+    accion: "EDITAR_RESERVA",
+    entidad: "Reserva",
+    entidadId: reservaId,
+    detalle: `${resultado.codigo} · Hab. ${resultado.habitacion.numero} · ${resultado.cliente.nombre}`,
+  });
+
+  return resultado;
+}
+
 // Para el modal de "Llegó" en la app: además de la habitación que ya tenía
 // reservada, muestra qué otras habitaciones de la misma capacidad están
 // libres AHORA, por si se quiere reasignar al momento de la entrada.
