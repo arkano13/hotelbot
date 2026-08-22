@@ -34,6 +34,18 @@ async function ejecutarTransaccionSerializable(operacion, intentosMaximos = 3) {
  
   throw new Error("No se pudo completar la reserva por concurrencia.");
 }
+
+// La restricción "no_solape_habitacion" (EXCLUDE constraint a nivel de
+// Postgres) es la última línea de defensa contra dobles reservas: aunque
+// a alguna función se le olvide el chequeo manual, Postgres rechaza el
+// INSERT/UPDATE igual. Este helper detecta ese rechazo específico para
+// convertirlo en un mensaje entendible en vez de un error crudo de SQL.
+function esErrorDeSolapeHabitacion(error) {
+  return (
+    typeof error?.message === "string" &&
+    error.message.includes("no_solape_habitacion")
+  );
+}
  
 function crearFecha(fecha) {
   return crearFechaHonduras(fecha);
@@ -244,7 +256,8 @@ export async function crearReservaTemporal({
   // se deja de calcular expiraEn, siempre queda en null.
   const expiraEn = null;
 
-  return ejecutarTransaccionSerializable(async (tx) => {
+  try {
+  const resultado = await ejecutarTransaccionSerializable(async (tx) => {
     const conflicto = await tx.reserva.findFirst({
       where: {
         habitacionId:
@@ -339,6 +352,17 @@ export async function crearReservaTemporal({
  
     return resultado;
   });
+
+  return resultado;
+  } catch (error) {
+    if (esErrorDeSolapeHabitacion(error)) {
+      throw new Error(
+        "La habitación dejó de estar disponible. Intenta nuevamente"
+      );
+    }
+
+    throw error;
+  }
 }
  
 export async function crearReservaWalkIn({
@@ -479,7 +503,8 @@ export async function crearReservaWalkIn({
     ? await crearOActualizarCliente({ nombre: nombreLimpio, telefono: telefonoLimpio, documento: documentoLimpio })
     : await prisma.cliente.create({ data: { nombre: nombreLimpio, telefono: null, documento: documentoLimpio || null } });
  
-  return ejecutarTransaccionSerializable(async (tx) => {
+  try {
+  const resultado = await ejecutarTransaccionSerializable(async (tx) => {
     const conflictoDentroDeTransaccion = await tx.reserva.findFirst({
       where: {
         habitacionId: habitacion.id,
@@ -546,6 +571,15 @@ export async function crearReservaWalkIn({
  
     return resultado;
   });
+
+  return resultado;
+  } catch (error) {
+    if (esErrorDeSolapeHabitacion(error)) {
+      throw new Error("La habitación dejó de estar disponible.");
+    }
+
+    throw error;
+  }
 }
  
 export async function crearReservasMultiples({
@@ -612,7 +646,8 @@ export async function crearReservasMultiples({
   // Ya no vencen las reservas pendientes de pago (decisión del hotel).
   const expiraEn = null;
 
-  return ejecutarTransaccionSerializable(async (tx) => {
+  try {
+  return await ejecutarTransaccionSerializable(async (tx) => {
     const reservas = [];
  
     for (
@@ -715,6 +750,15 @@ export async function crearReservasMultiples({
  
     return reservas;
   });
+  } catch (error) {
+    if (esErrorDeSolapeHabitacion(error)) {
+      throw new Error(
+        "Una de las habitaciones dejó de estar disponible. Intenta nuevamente"
+      );
+    }
+
+    throw error;
+  }
 }
  
 export async function listarHabitacionesDisponiblesWalkIn({ fechaEntrada, fechaSalida, personas }) {
@@ -907,12 +951,31 @@ export async function editarReserva(
     throw new Error("No hay cambios para guardar.");
   }
 
+  try {
   const resultado = await prisma.$transaction(async (tx) => {
     if (nombreLimpio) {
       await tx.cliente.update({
         where: { id: reserva.clienteId },
         data: { nombre: nombreLimpio },
       });
+    }
+    if (datosReserva.fechaSalida) {
+      const conflicto = await tx.reserva.findFirst({
+        where: {
+          id: { not: reservaId },
+          habitacionId: reserva.habitacionId,
+          estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA", "CHECK_IN"] },
+          fechaEntrada: { lt: datosReserva.fechaSalida },
+          fechaSalida: { gt: reserva.fechaEntrada },
+        },
+        select: { id: true },
+      });
+
+      if (conflicto) {
+        throw new Error(
+          "No se puede extender: la habitación ya tiene otra reserva en esas fechas."
+        );
+      }
     }
     if (Object.keys(datosReserva).length > 0) {
       await tx.reserva.update({ where: { id: reservaId }, data: datosReserva });
@@ -921,7 +984,7 @@ export async function editarReserva(
       where: { id: reservaId },
       include: { cliente: true, habitacion: true },
     });
-  });
+  }, { isolationLevel: "Serializable" });
 
   await registrarAuditoria({
     accion: "EDITAR_RESERVA",
@@ -931,6 +994,15 @@ export async function editarReserva(
   });
 
   return resultado;
+  } catch (error) {
+    if (esErrorDeSolapeHabitacion(error)) {
+      throw new Error(
+        "No se puede extender: la habitación ya tiene otra reserva en esas fechas."
+      );
+    }
+
+    throw error;
+  }
 }
 
 // Para el modal de "Llegó" en la app: además de la habitación que ya tenía
@@ -998,6 +1070,7 @@ export async function registrarCheckInPorHabitacion(
 ) {
   const { fin } = obtenerRangoHoyHonduras();
  
+  try {
   const reservaActualizada = await ejecutarTransaccionSerializable(async (tx) => {
     const reserva = await tx.reserva.findFirst({
       where: {
@@ -1091,8 +1164,15 @@ export async function registrarCheckInPorHabitacion(
   });
  
   return reservaActualizada;
+  } catch (error) {
+    if (esErrorDeSolapeHabitacion(error)) {
+      throw new Error("Esa habitación ya no está disponible para estas fechas.");
+    }
+
+    throw error;
+  }
 }
- 
+
 export async function registrarCheckoutPorHabitacion(habitacionId) {
   const reserva = await prisma.reserva.findFirst({
     where: { habitacionId, estado: "CHECK_IN" },
@@ -1384,6 +1464,7 @@ export async function rechazarHabitacionMasGrande(reservaId) {
 // podían pasar ambos la validación y terminar duplicando la ocupación.
 // Ahora todo corre dentro de ejecutarTransaccionSerializable.
 export async function moverReservaDeHabitacion(reservaId, nuevaHabitacionId) {
+  try {
   const { actualizada, habitacionAnteriorNumero } = await ejecutarTransaccionSerializable(async (tx) => {
     const reserva = await tx.reserva.findUnique({
       where: { id: reservaId },
@@ -1448,6 +1529,13 @@ export async function moverReservaDeHabitacion(reservaId, nuevaHabitacionId) {
   });
  
   return actualizada;
+  } catch (error) {
+    if (esErrorDeSolapeHabitacion(error)) {
+      throw new Error("No se puede mover: la habitación ya tiene otra reserva en esas fechas.");
+    }
+
+    throw error;
+  }
 }
  
 // Lista las reservas activas (para elegir cuál mover), con su
