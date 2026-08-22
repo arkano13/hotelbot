@@ -6,6 +6,7 @@ import { SYSTEM_PROMPT } from "./prompt.js";
 import { hotelTools } from "./tools.js";
 import { ejecutarTool } from "./executeTool.js";
 import { obtenerClientePorTelefono } from "../clientes/service.js";
+import { obtenerTarifas } from "../tarifas/service.js";
 
 if (!process.env.GEMINI_API_KEY) {
   throw new Error("GEMINI_API_KEY no está configurada en el archivo .env");
@@ -154,6 +155,26 @@ export async function generarRespuestaGemini({
   const fechaActual = obtenerFechaActual();
   const horaActual = obtenerHoraActual();
 
+  let bloqueTarifas = "";
+  try {
+    const tarifas = await obtenerTarifas();
+    const lineas = tarifas
+      .map((t) => `- ${t.personas} persona(s): HNL ${Number(t.precio)} la noche`)
+      .join("\n");
+
+    bloqueTarifas = `
+PRECIOS ACTUALES POR NOCHE (esta es la única fuente de verdad — ignora cualquier precio que hayas mencionado antes en esta conversación si no coincide con esta lista):
+${lineas}
+- Las habitaciones de 3 personas también cubren grupos de 4 sin costo adicional.
+
+Aun así, SIEMPRE ejecuta buscar_disponibilidad para calcular el total exacto (precio por noche × noches) — esta lista es solo para que no repitas un precio viejo, no reemplaza la llamada a la herramienta.
+`;
+  } catch {
+    // Si falla la consulta de tarifas, seguimos sin este bloque — la
+    // herramienta buscar_disponibilidad sigue siendo la fuente real.
+    bloqueTarifas = "";
+  }
+
   let clienteConocido = null;
   try {
     clienteConocido = await obtenerClientePorTelefono(telefono);
@@ -184,7 +205,7 @@ FECHA ACTUAL:
 - Hoy es ${fechaActual}.
 - Hora actual: ${horaActual} (usa esto para saludar según el momento del día: buenos días, buenas tardes o buenas noches).
 - Zona horaria: America/Tegucigalpa.
-${bloqueClienteConocido}
+${bloqueTarifas}${bloqueClienteConocido}
 ESTADO ACTUAL:
 - Paso de reserva: ${step}
 - Teléfono del cliente: ${telefono}
