@@ -100,7 +100,8 @@ model Tarifa {
 
 model Reserva {
   id           String @id @default(uuid())
-  codigo       String @unique
+  codigo          String  @unique
+  idempotencyKey String? @unique
   clienteId    String
   habitacionId String
 

@@ -226,6 +226,7 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         documento,
         metodoPago,
         habitacionPreferida: argumentos.habitacion,
+        idempotencyKey: `whatsapp:${conversationId}:${conversacion.ultimaDisponibilidadAt.getTime()}`,
       });
 
       await actualizarEstadoConversacion(conversationId, {

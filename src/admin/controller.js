@@ -21,6 +21,7 @@ import {
   rechazarHabitacionMasGrande,
   moverReservaDeHabitacion,
   listarReservasActivasParaMover,
+  listarTodasLasReservas,
   listarHabitacionesLibresParaMover,
   editarReserva,
 } from "../reservas/service.js";
@@ -451,6 +452,15 @@ export async function fechaActualHonduras(req, res) {
     }).format(new Date());
 
     return res.json({ success: true, data: { fecha } });
+  } catch (error) {
+    return manejarError(res, error);
+  }
+}
+
+export async function todasLasReservas(req, res) {
+  try {
+    const datos = await listarTodasLasReservas();
+    return res.json({ success: true, data: datos });
   } catch (error) {
     return manejarError(res, error);
   }
