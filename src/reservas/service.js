@@ -258,9 +258,9 @@ export async function crearReservaTemporal({
     salida
   );
  
-  const precioPorNoche = Number(
-    tarifa.precio
-  );
+  const precioPorNoche = disponibilidad.habitacion.precioBase
+    ? Number(disponibilidad.habitacion.precioBase)
+    : Number(tarifa.precio);
  
   const precioTotal =
     precioPorNoche * cantidadNoches;
@@ -736,9 +736,9 @@ export async function crearReservasMultiples({
           personasAsignadas
         );
  
-      const precioPorNoche = Number(
-        tarifa.precio
-      );
+      const precioPorNoche = habitacion.precioBase
+        ? Number(habitacion.precioBase)
+        : Number(tarifa.precio);
  
       const precioTotal =
         precioPorNoche * cantidadNoches;

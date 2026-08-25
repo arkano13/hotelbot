@@ -108,7 +108,9 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
       if (resultado.disponible) {
         const tarifa = await obtenerTarifaPorPersonas(personas);
 
-        precioPorNoche = Number(tarifa.precio);
+        precioPorNoche = resultado.habitacion.precioBase
+          ? Number(resultado.habitacion.precioBase)
+          : Number(tarifa.precio);
         precioTotal = precioPorNoche * cantidadNoches;
       }
 
@@ -136,6 +138,8 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
         precioPorNoche,
         precioTotal,
         moneda: "HNL",
+        habitacionAsignada: resultado.habitacion?.numero ?? null,
+        sinAire: resultado.habitacion ? !resultado.habitacion.tieneAire : false,
       };
     }
 
@@ -418,10 +422,14 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
       let precioTotalPorNoche = 0;
 
       if (resultado.disponible) {
-        for (const capacidad of resultado.distribucion) {
-          const tarifa = await obtenerTarifaPorPersonas(capacidad);
+        for (const habitacion of resultado.habitaciones) {
+          const tarifa = await obtenerTarifaPorPersonas(
+            habitacion.capacidadAsignada,
+          );
 
-          precioTotalPorNoche += Number(tarifa.precio);
+          precioTotalPorNoche += habitacion.precioBase
+            ? Number(habitacion.precioBase)
+            : Number(tarifa.precio);
         }
       }
 
@@ -451,6 +459,9 @@ export async function ejecutarTool(nombre, argumentos = {}, contexto = {}) {
           ? precioTotalPorNoche * cantidadNoches
           : null,
         moneda: "HNL",
+        incluyeHabitacionSinAire: resultado.habitaciones.some(
+          (habitacion) => !habitacion.tieneAire,
+        ),
       };
     }
     case "crear_reservas_multiples": {

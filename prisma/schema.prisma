@@ -53,13 +53,15 @@ enum MessageRole {
 }
 
 model Habitacion {
-  id        String           @id @default(uuid())
-  numero    String           @unique
-  capacidad Int
-  estado    EstadoHabitacion @default(DISPONIBLE)
-  activa    Boolean          @default(true)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id         String           @id @default(uuid())
+  numero     String           @unique
+  capacidad  Int
+  tieneAire  Boolean          @default(true)
+  precioBase Decimal?         @db.Decimal(10, 2)
+  estado     EstadoHabitacion @default(DISPONIBLE)
+  activa     Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   reservas Reserva[]
 

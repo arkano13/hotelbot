@@ -102,6 +102,9 @@ export async function consultarDisponibilidad({
     },
     orderBy: [
       {
+        tieneAire: "desc",
+      },
+      {
         capacidad: "asc",
       },
       {
@@ -206,7 +209,10 @@ export async function consultarDisponibilidadMultiple({
   }
 
   const disponiblesOrdenadas = [...habitacionesDisponibles].sort(
-    (a, b) => a.capacidad - b.capacidad || Number(a.numero) - Number(b.numero)
+    (a, b) =>
+      Number(b.tieneAire) - Number(a.tieneAire) ||
+      a.capacidad - b.capacidad ||
+      Number(a.numero) - Number(b.numero)
   );
 
   function intentarConBloquesIdeales() {
@@ -242,6 +248,8 @@ export async function consultarDisponibilidadMultiple({
         numero: habitacion.numero,
         capacidadAsignada: capacidadNecesaria,
         capacidadMaxima: habitacion.capacidad,
+        tieneAire: habitacion.tieneAire,
+        precioBase: habitacion.precioBase,
       });
     }
 
@@ -256,7 +264,9 @@ export async function consultarDisponibilidadMultiple({
   // decir "no hay disponibilidad" cuando en realidad sí caben.
   function intentarConEmpaquetadoFlexible() {
     const ordenadasPorCapacidadDesc = [...habitacionesDisponibles].sort(
-      (a, b) => b.capacidad - a.capacidad
+      (a, b) =>
+        Number(b.tieneAire) - Number(a.tieneAire) ||
+        b.capacidad - a.capacidad
     );
 
     const seleccionadas = [];
@@ -277,6 +287,8 @@ export async function consultarDisponibilidadMultiple({
         numero: habitacion.numero,
         capacidadAsignada,
         capacidadMaxima: habitacion.capacidad,
+        tieneAire: habitacion.tieneAire,
+        precioBase: habitacion.precioBase,
       });
 
       restantes -= capacidadAsignada;
