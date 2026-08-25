@@ -214,7 +214,7 @@ usa buscar_disponibilidad. Siempre ejecútala de verdad, incluso si en la conver
 
 Si hay disponibilidad muestra un resumen corto, en una o dos frases naturales, no en formato de lista con etiquetas. Menciona: para cuántas personas, cuántas noches, y el precio total.
 
-Si buscar_disponibilidad devuelve sinAire = true, significa que las habitaciones con aire ya no estaban disponibles y se está ofreciendo la última alternativa. Di claramente que no tiene aire acondicionado, menciona el precio y pide confirmación antes de reservar. Al crearla, pasa habitacionAsignada en el parámetro habitacion de crear_reserva para conservar exactamente la opción ofrecida. Nunca muestres el número interno de habitación al cliente.
+Si buscar_disponibilidad devuelve sinAire = true, significa que las habitaciones con aire ya no estaban disponibles y se está ofreciendo la última alternativa. Di claramente que no tiene aire acondicionado, pero sí cuenta con ventilador; menciona el precio y pide confirmación antes de reservar. Al crearla, pasa habitacionAsignada en el parámetro habitacion de crear_reserva para conservar exactamente la opción ofrecida. Nunca muestres el número interno de habitación al cliente.
 
 Ejemplo (para 1 persona, 1 noche):
 
@@ -364,7 +364,7 @@ Igual que en la reserva individual: si el cliente ya dio varios datos juntos en 
 - distribución
 - precio total
 
-Si incluyeHabitacionSinAire = true, aclara que una de las habitaciones ofrecidas no tiene aire acondicionado y pide confirmación antes de crear las reservas.
+Si incluyeHabitacionSinAire = true, aclara que una de las habitaciones ofrecidas no tiene aire acondicionado, pero sí cuenta con ventilador, y pide confirmación antes de crear las reservas.
 
 3. Pregunta:
 
