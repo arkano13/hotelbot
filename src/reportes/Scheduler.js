@@ -22,6 +22,12 @@ const OWNER_PHONE = String(process.env.OWNER_PHONE ?? "")
   .replace(/\D/g, "")
   .trim();
 
+const REPORT_PHONE_2 = String(process.env.REPORT_PHONE_2 ?? "")
+  .replace(/\D/g, "")
+  .trim();
+
+const REPORT_PHONES = [...new Set([OWNER_PHONE, REPORT_PHONE_2].filter(Boolean))];
+
 let intervalo = null;
 let ultimaFechaDiaria = null;
 let ultimoMesEnviado = null;
@@ -113,17 +119,20 @@ async function cargarEstado() {
 }
 
 async function enviarDocumentoAlJefe({ buffer, nombreArchivo, texto }) {
-  if (!OWNER_PHONE) {
-    throw new Error("OWNER_PHONE no está configurado");
+  if (REPORT_PHONES.length === 0) {
+    throw new Error("OWNER_PHONE o REPORT_PHONE_2 deben estar configurados");
   }
 
   const socket = obtenerWhatsAppSocket();
-  await socket.sendMessage(`${OWNER_PHONE}@s.whatsapp.net`, {
-    document: buffer,
-    mimetype: "application/pdf",
-    fileName: nombreArchivo,
-    caption: texto,
-  });
+
+  for (const telefono of REPORT_PHONES) {
+    await socket.sendMessage(`${telefono}@s.whatsapp.net`, {
+      document: buffer,
+      mimetype: "application/pdf",
+      fileName: nombreArchivo,
+      caption: texto,
+    });
+  }
 }
 
 export async function enviarReporteDiario(fechaISO) {
