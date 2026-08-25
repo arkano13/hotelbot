@@ -1608,6 +1608,10 @@ export async function listarReservasActivasParaMover() {
     cliente: reserva.cliente.nombre,
     habitacionActual: reserva.habitacion.numero,
     cantidadPersonas: reserva.cantidadPersonas,
+    cantidadNoches: reserva.cantidadNoches,
+    tipoEstadia: reserva.tipoEstadia,
+    precioPorNoche: Number(reserva.precioPorNoche),
+    precioTotal: Number(reserva.precioTotal),
     fechaEntrada: reserva.fechaEntrada,
     fechaSalida: reserva.fechaSalida,
   }));
