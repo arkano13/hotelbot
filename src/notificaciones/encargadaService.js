@@ -1,6 +1,10 @@
 import { prisma } from "../lib/prisma.js";
 import { obtenerWhatsAppSocket } from "../whatsapp/client.js";
 
+const INTERVALO_REVISION_MS = 60 * 1000;
+
+let intervalo = null;
+
 // Horario de trabajo de la encargada (hora de Honduras). Configurable por
 // variables de entorno — mientras no se definan, usa 6am-5pm como
 // ejemplo razonable. HORA_FIN es exclusiva (17 significa "hasta las
@@ -130,4 +134,26 @@ export async function procesarNotificacionesPendientesEncargada() {
       `🛏️ ${cantidadEnviada}/${pendientes.length} notificación(es) pendiente(s) de la encargada enviadas.`
     );
   }
+}
+
+export function iniciarSchedulerNotificacionesEncargada() {
+  if (intervalo) return;
+
+  console.log(
+    "✅ Scheduler de la encargada iniciado: revisión cada minuto durante su horario"
+  );
+
+  procesarNotificacionesPendientesEncargada().catch(console.error);
+
+  intervalo = setInterval(() => {
+    procesarNotificacionesPendientesEncargada().catch(console.error);
+  }, INTERVALO_REVISION_MS);
+}
+
+export function detenerSchedulerNotificacionesEncargada() {
+  if (!intervalo) return;
+
+  clearInterval(intervalo);
+  intervalo = null;
+  console.log("🛑 Scheduler de la encargada detenido");
 }
