@@ -1490,6 +1490,22 @@ export async function rechazarHabitacionMasGrande(reservaId) {
   return actualizada;
 }
  
+// Lista completa para administración: incluye reservas de cualquier fecha
+// y estado, junto con habitación, cliente y pago.
+export async function listarTodasLasReservas() {
+  return prisma.reserva.findMany({
+    orderBy: [
+      { fechaEntrada: "desc" },
+      { createdAt: "desc" },
+    ],
+    include: {
+      habitacion: true,
+      cliente: true,
+      pago: true,
+    },
+  });
+}
+
 // Mueve una reserva activa (pendiente, confirmada, o ya con check-in) a
 // otra habitación — para corregir errores ("me equivoqué y la puse en la
 // 1, muévela a la 2") sin tener que tocar la base de datos a mano.
