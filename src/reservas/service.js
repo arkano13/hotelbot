@@ -47,6 +47,21 @@ function esErrorDeSolapeHabitacion(error) {
   );
 }
  
+function normalizarClaveIdempotencia(valor) {
+  const clave = String(valor ?? "").trim();
+  if (!clave) return null;
+  if (clave.length > 200) throw new Error("La clave de la operación no es válida.");
+  return clave;
+}
+
+async function obtenerReservaPorClaveIdempotencia(idempotencyKey, db = prisma) {
+  if (!idempotencyKey) return null;
+  return db.reserva.findUnique({
+    where: { idempotencyKey },
+    include: { habitacion: true, cliente: true, pago: true },
+  });
+}
+
 function crearFecha(fecha) {
   return crearFechaHonduras(fecha);
 }
@@ -186,6 +201,7 @@ export async function crearReservaTemporal({
   metodoPago,
   observaciones,
   habitacionPreferida,
+  idempotencyKey,
 }) {
   const {
     nombreLimpio,
@@ -211,6 +227,10 @@ export async function crearReservaTemporal({
     );
   }
  
+  const claveIdempotencia = normalizarClaveIdempotencia(idempotencyKey);
+  const reservaExistente = await obtenerReservaPorClaveIdempotencia(claveIdempotencia);
+  if (reservaExistente) return reservaExistente;
+
   const disponibilidad =
     await consultarDisponibilidad({
       fechaEntrada,
@@ -296,6 +316,7 @@ export async function crearReservaTemporal({
     const reserva = await tx.reserva.create({
       data: {
         codigo,
+        idempotencyKey: claveIdempotencia,
         clienteId: cliente.id,
  
         habitacionId:
@@ -355,6 +376,11 @@ export async function crearReservaTemporal({
 
   return resultado;
   } catch (error) {
+    if (error?.code === "P2002" && claveIdempotencia) {
+      const existente = await obtenerReservaPorClaveIdempotencia(claveIdempotencia);
+      if (existente) return existente;
+    }
+
     if (esErrorDeSolapeHabitacion(error)) {
       throw new Error(
         "La habitación dejó de estar disponible. Intenta nuevamente"
@@ -378,6 +404,7 @@ export async function crearReservaWalkIn({
   modo,
   yaPago,
   precioPorNoche: precioPorNocheIngresado,
+  idempotencyKey,
 }) {
   // "OCUPAR" (por defecto): el huésped ya está físicamente ahí, la
   // habitación queda ocupada de inmediato (CHECK_IN), y siempre se cobra
@@ -390,6 +417,9 @@ export async function crearReservaWalkIn({
   //     de WhatsApp en efectivo), si no, se libera sola.
   const soloReservar = String(modo ?? "OCUPAR").toUpperCase() === "RESERVAR";
   const reservaYaPagada = !soloReservar || Boolean(yaPago);
+  const claveIdempotencia = normalizarClaveIdempotencia(idempotencyKey);
+  const reservaExistente = await obtenerReservaPorClaveIdempotencia(claveIdempotencia);
+  if (reservaExistente) return reservaExistente;
  
   const metodo = String(metodoPago ?? "EFECTIVO").trim().toUpperCase();
  
@@ -523,6 +553,7 @@ export async function crearReservaWalkIn({
     const reserva = await tx.reserva.create({
       data: {
         codigo,
+        idempotencyKey: claveIdempotencia,
         clienteId: cliente.id,
         habitacionId: habitacion.id,
         fechaEntrada: entrada,
@@ -574,6 +605,11 @@ export async function crearReservaWalkIn({
 
   return resultado;
   } catch (error) {
+    if (error?.code === "P2002" && claveIdempotencia) {
+      const existente = await obtenerReservaPorClaveIdempotencia(claveIdempotencia);
+      if (existente) return existente;
+    }
+
     if (esErrorDeSolapeHabitacion(error)) {
       throw new Error("La habitación dejó de estar disponible.");
     }
