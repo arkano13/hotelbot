@@ -33,7 +33,6 @@ import {
   reporteMensual,
   fechaActualHonduras,
   reservasActivasParaMover,
-  todasLasReservas,
   habitacionesLibresParaMover,
   moverHabitacion,
   registrarDispositivoPush,
@@ -99,10 +98,7 @@ router.get("/reportes/mensual", reporteMensual);
 // dispositivo (tablets a veces tienen mal la zona horaria).
 router.get("/fecha-actual", fechaActualHonduras);
 
-// Todas las reservaciones, sin importar fecha ni estado
-router.get("/reservas/todas", todasLasReservas);
-
-// Mover o editar una reserva activa
+// Mover una reserva activa a otra habitación
 router.get("/mover-habitacion/reservas", reservasActivasParaMover);
 router.get("/mover-habitacion/:reservaId/habitaciones-libres", habitacionesLibresParaMover);
 router.post("/mover-habitacion/:reservaId", moverHabitacion);
