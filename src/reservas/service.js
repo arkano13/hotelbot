@@ -47,21 +47,6 @@ function esErrorDeSolapeHabitacion(error) {
   );
 }
  
-function normalizarClaveIdempotencia(valor) {
-  const clave = String(valor ?? "").trim();
-  if (!clave) return null;
-  if (clave.length > 200) throw new Error("La clave de la operación no es válida.");
-  return clave;
-}
-
-async function obtenerReservaPorClaveIdempotencia(idempotencyKey, db = prisma) {
-  if (!idempotencyKey) return null;
-  return db.reserva.findUnique({
-    where: { idempotencyKey },
-    include: { habitacion: true, cliente: true, pago: true },
-  });
-}
-
 function crearFecha(fecha) {
   return crearFechaHonduras(fecha);
 }
@@ -201,7 +186,6 @@ export async function crearReservaTemporal({
   metodoPago,
   observaciones,
   habitacionPreferida,
-  idempotencyKey,
 }) {
   const {
     nombreLimpio,
@@ -227,10 +211,6 @@ export async function crearReservaTemporal({
     );
   }
  
-  const claveIdempotencia = normalizarClaveIdempotencia(idempotencyKey);
-  const reservaExistente = await obtenerReservaPorClaveIdempotencia(claveIdempotencia);
-  if (reservaExistente) return reservaExistente;
-
   const disponibilidad =
     await consultarDisponibilidad({
       fechaEntrada,
@@ -258,9 +238,9 @@ export async function crearReservaTemporal({
     salida
   );
  
-  const precioPorNoche = Number(
-    tarifa.precio
-  );
+  const precioPorNoche = disponibilidad.habitacion.precioBase
+    ? Number(disponibilidad.habitacion.precioBase)
+    : Number(tarifa.precio);
  
   const precioTotal =
     precioPorNoche * cantidadNoches;
@@ -316,7 +296,6 @@ export async function crearReservaTemporal({
     const reserva = await tx.reserva.create({
       data: {
         codigo,
-        idempotencyKey: claveIdempotencia,
         clienteId: cliente.id,
  
         habitacionId:
@@ -376,11 +355,6 @@ export async function crearReservaTemporal({
 
   return resultado;
   } catch (error) {
-    if (error?.code === "P2002" && claveIdempotencia) {
-      const existente = await obtenerReservaPorClaveIdempotencia(claveIdempotencia);
-      if (existente) return existente;
-    }
-
     if (esErrorDeSolapeHabitacion(error)) {
       throw new Error(
         "La habitación dejó de estar disponible. Intenta nuevamente"
@@ -404,7 +378,6 @@ export async function crearReservaWalkIn({
   modo,
   yaPago,
   precioPorNoche: precioPorNocheIngresado,
-  idempotencyKey,
 }) {
   // "OCUPAR" (por defecto): el huésped ya está físicamente ahí, la
   // habitación queda ocupada de inmediato (CHECK_IN), y siempre se cobra
@@ -417,9 +390,6 @@ export async function crearReservaWalkIn({
   //     de WhatsApp en efectivo), si no, se libera sola.
   const soloReservar = String(modo ?? "OCUPAR").toUpperCase() === "RESERVAR";
   const reservaYaPagada = !soloReservar || Boolean(yaPago);
-  const claveIdempotencia = normalizarClaveIdempotencia(idempotencyKey);
-  const reservaExistente = await obtenerReservaPorClaveIdempotencia(claveIdempotencia);
-  if (reservaExistente) return reservaExistente;
  
   const metodo = String(metodoPago ?? "EFECTIVO").trim().toUpperCase();
  
@@ -553,7 +523,6 @@ export async function crearReservaWalkIn({
     const reserva = await tx.reserva.create({
       data: {
         codigo,
-        idempotencyKey: claveIdempotencia,
         clienteId: cliente.id,
         habitacionId: habitacion.id,
         fechaEntrada: entrada,
@@ -605,11 +574,6 @@ export async function crearReservaWalkIn({
 
   return resultado;
   } catch (error) {
-    if (error?.code === "P2002" && claveIdempotencia) {
-      const existente = await obtenerReservaPorClaveIdempotencia(claveIdempotencia);
-      if (existente) return existente;
-    }
-
     if (esErrorDeSolapeHabitacion(error)) {
       throw new Error("La habitación dejó de estar disponible.");
     }
@@ -736,9 +700,9 @@ export async function crearReservasMultiples({
           personasAsignadas
         );
  
-      const precioPorNoche = Number(
-        tarifa.precio
-      );
+      const precioPorNoche = habitacion.precioBase
+        ? Number(habitacion.precioBase)
+        : Number(tarifa.precio);
  
       const precioTotal =
         precioPorNoche * cantidadNoches;
@@ -1490,22 +1454,6 @@ export async function rechazarHabitacionMasGrande(reservaId) {
   return actualizada;
 }
  
-// Lista completa para administración: incluye reservas de cualquier fecha
-// y estado, junto con habitación, cliente y pago.
-export async function listarTodasLasReservas() {
-  return prisma.reserva.findMany({
-    orderBy: [
-      { fechaEntrada: "desc" },
-      { createdAt: "desc" },
-    ],
-    include: {
-      habitacion: true,
-      cliente: true,
-      pago: true,
-    },
-  });
-}
-
 // Mueve una reserva activa (pendiente, confirmada, o ya con check-in) a
 // otra habitación — para corregir errores ("me equivoqué y la puse en la
 // 1, muévela a la 2") sin tener que tocar la base de datos a mano.
@@ -1608,10 +1556,6 @@ export async function listarReservasActivasParaMover() {
     cliente: reserva.cliente.nombre,
     habitacionActual: reserva.habitacion.numero,
     cantidadPersonas: reserva.cantidadPersonas,
-    cantidadNoches: reserva.cantidadNoches,
-    tipoEstadia: reserva.tipoEstadia,
-    precioPorNoche: Number(reserva.precioPorNoche),
-    precioTotal: Number(reserva.precioTotal),
     fechaEntrada: reserva.fechaEntrada,
     fechaSalida: reserva.fechaSalida,
   }));
