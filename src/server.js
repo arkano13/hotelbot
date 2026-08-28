@@ -32,11 +32,6 @@ import {
   detenerExpiracionReservas,
 } from "./reservas/expirationScheduler.js";
 
-import {
-  iniciarSchedulerNotificacionesEncargada,
-  detenerSchedulerNotificacionesEncargada,
-} from "./notificaciones/encargadaService.js";
-
 const PORT = Number(process.env.PORT) || 3000;
 
 let servidor = null;
@@ -47,7 +42,6 @@ function iniciarSchedulers() {
   iniciarSchedulerConversaciones();
   iniciarSchedulerReportes();
   iniciarSchedulerBackups();
-  iniciarSchedulerNotificacionesEncargada();
 }
 
 function detenerSchedulers() {
@@ -55,7 +49,6 @@ function detenerSchedulers() {
   detenerSchedulerConversaciones();
   detenerSchedulerReportes();
   detenerSchedulerBackups();
-  detenerSchedulerNotificacionesEncargada();
 }
 
 async function iniciarServidor() {

@@ -4,7 +4,6 @@ import {
   procesarCheckoutsPorHoras,
 } from "./expirationService.js";
 import { obtenerHoraCheckOutTexto } from "../config/hotelInfo.js";
-import { procesarNotificacionesPendientesEncargada } from "../notificaciones/encargadaService.js";
 
 const INTERVALO_REVISION_MS = 60 * 1000;
 
@@ -22,7 +21,6 @@ async function revisarReservas() {
     await expirarReservasPendientes();
     await procesarCheckoutsAutomaticos();
     await procesarCheckoutsPorHoras();
-    await procesarNotificacionesPendientesEncargada();
   } catch (error) {
     console.error("❌ Error ejecutando scheduler de reservas:", error);
   } finally {
