@@ -98,7 +98,7 @@ function dibujarPiesDePagina(doc) {
         `${HOTEL_NOMBRE} · Reporte generado automáticamente`,
         MARGEN,
         yPie + 8,
-        { width: anchoUtil(doc) / 2, align: "left", lineBreak: false }
+        { width: anchoUtil(doc) / 2, align: "left", lineBreak: false, height: 12, ellipsis: true }
       );
 
     doc.text(
@@ -379,6 +379,10 @@ export async function generarPdfDiario(resumen) {
       ["Habitaciones vendidas", String(resumen.habitacionesVendidas)],
     ]);
 
+    const turnos = resumen.turnos || [resumen];
+    for (const turno of turnos) {
+      const resumen = turno;
+      if (turno.titulo) dibujarSeccion(doc, turno.titulo);
     dibujarSeccion(
       doc,
       `Transferencias aprobadas (${resumen.cantidadTransferencias})`,
@@ -412,6 +416,8 @@ export async function generarPdfDiario(resumen) {
       "No hubo ingresos en efectivo en este día.",
     );
 
+
+    }
     if (resumen.cancelacionesSinReembolso.length > 0) {
       dibujarSeccion(
         doc,
@@ -566,5 +572,37 @@ export async function generarPdfMensual(resumen) {
         `${mejorDiaTexto}La ocupación se calcula con estadías pagadas y activas durante el mes. Los ingresos solo incluyen pagos aprobados por transferencia, tarjeta o efectivo; se excluyen pagos pendientes, rechazados, vencidos y no generados.`,
         { width: anchoUtil(doc) },
       );
+  });
+}
+
+export function generarPdfTarde(r) {
+  return generarBuffer('Cierre de la tarde - ingresos confirmados', doc => {
+    doc.font('Helvetica-Bold').fontSize(14).fillColor(COLOR_TEXTO).text(formatearFecha(r.fecha));
+    doc.moveDown(0.5);
+    doc.font('Helvetica').fontSize(10).text('Pagos de 6:00 a. m. a 6:00 p. m. (hora de Honduras)');
+    doc.moveDown(1);
+    dibujarMetricas(doc, [
+      ['Ingresos recibidos', formatearMoneda(r.ingresosTotal)],
+      ['Por transferencia', formatearMoneda(r.ingresosTransferencia)],
+      ['Por tarjeta', formatearMoneda(r.ingresosTarjeta)],
+      ['En efectivo', formatearMoneda(r.ingresosEfectivo)],
+      ['Pagos confirmados', String(r.cantidadPagos)],
+      ['Ticket promedio', formatearMoneda(r.ticketPromedio)],
+    ]);
+    dibujarSeccion(doc, 'Ingresos por método de pago');
+    dibujarTabla(doc, [
+      {titulo:'Método',ancho:0.45},{titulo:'Pagos',ancho:0.2,align:'center'},
+      {titulo:'Ingresos',ancho:0.35,align:'right'}
+    ], [
+      ['TRANSFERENCIA',r.cantidadTransferencias,formatearMoneda(r.ingresosTransferencia)],
+      ['TARJETA',r.cantidadTarjetas,formatearMoneda(r.ingresosTarjeta)],
+      ['EFECTIVO',r.cantidadEfectivos,formatearMoneda(r.ingresosEfectivo)],
+      ['TOTAL',r.cantidadPagos,formatearMoneda(r.ingresosTotal)]
+    ], 'Sin pagos confirmados.');
+    dibujarSeccion(doc, 'Criterio del reporte');
+    doc.font('Helvetica').fontSize(9).fillColor(COLOR_TEXTO_SUAVE).text(
+      'Solo se incluyen pagos aprobados por transferencia, tarjeta o efectivo. Se excluyen reservas sin pago y pagos pendientes, rechazados, vencidos o no generados.', {width:anchoUtil(doc)});
+    doc.moveDown();
+    doc.text('El informe completo de la mañana incluye este período y el turno de la noche. Este cierre es informativo y no representa ingresos adicionales.');
   });
 }

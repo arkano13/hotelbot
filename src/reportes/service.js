@@ -147,7 +147,18 @@ export async function obtenerResumenDiario(fechaISO) {
     tipo: "DIARIO",
     fecha: fechaISO,
     ...resumirPagos(pagos),
+    turnos: [
+      { titulo: 'Pagos de 6:00 a. m. a 6:00 p. m.', ...resumirPagos(pagos.filter(p => new Date(p.fechaPago).getTime() < inicio.getTime() + MILISEGUNDOS_DIA / 2)) },
+      { titulo: 'Pagos de 6:00 p. m. a 6:00 a. m. del día siguiente', ...resumirPagos(pagos.filter(p => new Date(p.fechaPago).getTime() >= inicio.getTime() + MILISEGUNDOS_DIA / 2)) },
+    ],
   };
+}
+
+export async function obtenerResumenTarde(fechaISO) {
+  const { inicio } = rangoDelDiaHonduras(fechaISO);
+  const fin = new Date(inicio.getTime() + MILISEGUNDOS_DIA / 2);
+  const pagos = await consultarPagosCobrados(inicio, fin);
+  return { tipo: 'TARDE', fecha: fechaISO, ...resumirPagos(pagos) };
 }
 
 function agruparPorDia(pagos) {

@@ -3,10 +3,12 @@ import path from "path";
 
 import {
   obtenerResumenDiario,
+  obtenerResumenTarde,
   obtenerResumenMensual,
 } from "./service.js";
 import {
   generarPdfDiario,
+  generarPdfTarde,
   generarPdfMensual,
 } from "./pdf.js";
 
@@ -30,6 +32,7 @@ const REPORT_PHONES = [...new Set([OWNER_PHONE, REPORT_PHONE_2].filter(Boolean))
 
 let intervalo = null;
 let ultimaFechaDiaria = null;
+let ultimaFechaTarde = null;
 let ultimoMesEnviado = null;
 let ejecutando = false;
 let estadoCargado = false;
@@ -52,7 +55,7 @@ async function guardarEstado() {
 
   const temporal = `${RUTA_ESTADO}.tmp`;
   const contenido = JSON.stringify(
-    { ultimaFechaDiaria, ultimoMesEnviado },
+    { ultimaFechaDiaria, ultimaFechaTarde, ultimoMesEnviado },
     null,
     2,
   );
@@ -96,6 +99,7 @@ async function cargarEstado() {
     const contenido = await fs.readFile(RUTA_ESTADO, "utf-8");
     const estado = JSON.parse(contenido);
     ultimaFechaDiaria = estado.ultimaFechaDiaria || null;
+    ultimaFechaTarde = estado.ultimaFechaTarde || null;
     ultimoMesEnviado = estado.ultimoMesEnviado || null;
   } catch (error) {
     if (error?.code !== "ENOENT") {
@@ -159,6 +163,18 @@ export async function enviarReporteDiario(fechaISO) {
   return resumen;
 }
 
+export async function enviarReporteTarde(fechaISO) {
+  const resumen = await obtenerResumenTarde(fechaISO);
+  const buffer = await generarPdfTarde(resumen);
+  await enviarDocumentoAlJefe({
+    buffer,
+    nombreArchivo: 'cierre-tarde-' + fechaISO + '.pdf',
+    destinatarios: REPORT_PHONES,
+    texto: 'Cierre de la tarde - ' + fechaISO + '\n6:00 a. m. a 6:00 p. m.\nTotal recibido: ' + formatearMoneda(resumen.ingresosTotal) + '\nPagos confirmados: ' + resumen.cantidadPagos,
+  });
+  return resumen;
+}
+
 export async function enviarReporteMensual(anio, mes) {
   const resumen = await obtenerResumenMensual(anio, mes);
   const pdf = await generarPdfMensual(resumen);
@@ -198,6 +214,13 @@ async function revisarReportes() {
       console.log(`📋 Reporte diario PDF enviado: ${fechaReporte}`);
     }
 
+    if (datos.hora >= 18 && ultimaFechaTarde !== datos.fechaISO) {
+      await enviarReporteTarde(datos.fechaISO);
+      ultimaFechaTarde = datos.fechaISO;
+      await guardarEstado();
+      console.log('Cierre de la tarde enviado: ' + datos.fechaISO);
+    }
+
     const claveMes = `${datos.anio}-${String(datos.mes).padStart(2, "0")}`;
 
     if (
@@ -227,7 +250,7 @@ export function iniciarSchedulerReportes() {
   }
 
   console.log(
-    `✅ Scheduler de reportes iniciado: PDF diario del día anterior desde las ${HORA_REPORTE}:00 Honduras`,
+    `✅ Scheduler de reportes iniciado: PDF diario del día anterior desde las ${HORA_REPORTE}:00 Honduras; cierre de la tarde desde las 18:00`,
   );
 
   revisarReportes().catch(console.error);
