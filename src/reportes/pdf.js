@@ -416,7 +416,21 @@ export async function generarPdfDiario(resumen) {
       "No hubo ingresos en efectivo en este día.",
     );
 
-
+      if (doc.y + 34 > doc.page.height - 90) {
+        doc.addPage();
+        doc.y = MARGEN;
+      }
+      const ySubtotal = doc.y;
+      doc.rect(MARGEN, ySubtotal, anchoUtil(doc), 28)
+        .fillAndStroke(COLOR_FILA_PAR, COLOR_BORDE);
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(COLOR_PRIMARIO)
+        .text("Subtotal del turno", MARGEN + 8, ySubtotal + 8,
+          { width: anchoUtil(doc) * 0.6, lineBreak: false });
+      doc.text(formatearMoneda(turno.ingresosTotal),
+        MARGEN + anchoUtil(doc) * 0.6, ySubtotal + 8,
+        { width: anchoUtil(doc) * 0.4 - 8, align: "right", lineBreak: false });
+      doc.y = ySubtotal + 36;
+      doc.x = MARGEN;
     }
     if (resumen.cancelacionesSinReembolso.length > 0) {
       dibujarSeccion(

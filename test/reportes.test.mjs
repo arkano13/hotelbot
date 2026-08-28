@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 const root = new URL('../src/reportes/', import.meta.url);
@@ -27,6 +28,26 @@ test('Cortes de pagos, PDF y envío persistido de los dos reportes', async () =>
   const pdf=await import(new URL('pdf.js',root));
   for(const [fn,r] of [[pdf.generarPdfDiario,full],[pdf.generarPdfTarde,afternoon],[pdf.generarPdfDiario,empty],[pdf.generarPdfTarde,empty]]){
     const b=await fn(r);assert.equal(b.subarray(0,5).toString(),'%PDF-');assert.ok(b.length>1000);
+  }
+  const PDFDocument = createRequire(import.meta.url)('pdfkit');
+  const originalText = PDFDocument.prototype.text;
+  const texts = [];
+  PDFDocument.prototype.text = function(value, ...args) {
+    texts.push(String(value));
+    return originalText.call(this, value, ...args);
+  };
+  try {
+    for (const [report, expected] of [[full, 'L. 200.00'], [empty, 'L. 0.00']]) {
+      texts.length = 0;
+      await pdf.generarPdfDiario(report);
+      const subtotals = texts.flatMap((text, i) => text === 'Subtotal del turno' ? [texts[i + 1]] : []);
+      assert.deepEqual(subtotals, [expected, expected]);
+    }
+    texts.length = 0;
+    await pdf.generarPdfTarde(afternoon);
+    assert.equal(texts.includes('Subtotal del turno'), false);
+  } finally {
+    PDFDocument.prototype.text = originalText;
   }
   let stored={ultimaFechaDiaria:'2026-08-28',ultimoMesEnviado:null};
   const sends=[];
